@@ -439,33 +439,6 @@ def run_part1(rms=0, remove_bkg=False) :
     
     
     
-    # Plots initialization
-    
-    fig = plt.figure(figsize=(14, 16))
-    fig.subplots_adjust(wspace=0.05, left=0.1, right=0.95,
-                        bottom=0.15, top=0.9)
-    cmap='hsv'
-    vmax=0.95*np.max(image_data[int(xgxy-box):int(xgxy+box),int(ygxy-box):int(ygxy+box)])
-    vmin=0.001
-    if (vmin>vmax) : vmax=10.*vmin
-    
-    plt.subplot(221)
-    plt.imshow(image_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=vmax),cmap=cmap)
-    
-    plt.subplot(222)
-    plt.xlim(xgxy-box, xgxy+box)
-    plt.ylim(ygxy-box, ygxy+box)
-    plt.imshow(image_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=vmax),cmap=cmap)
-    aper.plot(color='red')
-    
-    
-    plt.subplot(223)
-    plt.xlim(xgxy-box, xgxy+box)
-    plt.ylim(ygxy-box, ygxy+box)
-    plt.imshow(masked_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=4*vmax),cmap=cmap)
-    
-    
-    
     # Galaxy final Modeling, starting from the initial values calculated before
     
     #Geometry modeling
@@ -526,12 +499,40 @@ def run_part1(rms=0, remove_bkg=False) :
         print("Plotting residuals")
         
         
+        # Plots initialization
+        
+        fig = plt.figure(figsize=(14, 16))
+        fig.subplots_adjust(wspace=0.05, left=0.1, right=0.95,
+                            bottom=0.15, top=0.9)
+        cmap='binary'
+        vmax=0.95*np.max(image_data[int(xgxy-box):int(xgxy+box),int(ygxy-box):int(ygxy+box)])
+        vmin=0.001
+        if (vmin>vmax) : vmax=10.*vmin
+        
+        plt.subplot(221)
+        plt.xlim(xgxy-box, xgxy+box)
+        plt.ylim(ygxy-box, ygxy+box)
+        plt.imshow(image_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=vmax), cmap=cmap)
+        
+        plt.subplot(222)
+        plt.xlim(xgxy-box, xgxy+box)
+        plt.ylim(ygxy-box, ygxy+box)
+        plt.imshow(masked_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=vmax),cmap=cmap)
+        aper.plot(color='red')
+        
+        
+        plt.subplot(223)
+        plt.xlim(xgxy-box, xgxy+box)
+        plt.ylim(ygxy-box, ygxy+box)
+        plt.imshow(image_model, origin='lower', norm=LogNorm(vmin=vmin, vmax=4*vmax),cmap=cmap)
+        
+        
         plt.subplot(224)
         plt.xlim(xgxy-box, xgxy+box)
         plt.ylim(ygxy-box, ygxy+box)
         plmedian=np.median((image_data-image_model)[int(xgxy-box/5):int(xgxy+box/5),int(ygxy-box/5):int(ygxy+box/5)])
         plstd=np.std((image_data-image_model)[int(xgxy-box/5):int(xgxy+box/5),int(ygxy-box/5):int(ygxy+box/5)])
-        plt.imshow((image_data-image_model), origin='lower', vmin=plmedian-.5*plstd, vmax=plmedian+.5*plstd,cmap=cmap)
+        plt.imshow((image_data-image_model), origin='lower',norm=LogNorm(vmin=vmin, vmax=vmax),cmap=cmap )
         plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name}_modelling.jpeg',dpi=300)
         plt.show()
         plt.clf()
