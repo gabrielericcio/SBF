@@ -88,13 +88,15 @@ def get_plots(catfilepath,gxyra,gxydec,gxyid,gxy_name) :
     plt.rc('font', **font)
     tsex = Table.read(catfilepath, format='ascii.sextractor')
     
-    #################Clean the table
+    #Clean the table
     tsex=tsex[(tsex['MAG_AUTO']<50) & (tsex['MAG_APER']<50)& (tsex['MAG_APER_1']<50)& (tsex['MAG_APER_2']<50)]
-
-
 
     #print(np.median(tsex[tsex['MAG_AUTO']<=20]['MAGERR_AUTO']))
     #print(np.median(tsex[tsex['CLASS_STAR']>=0.9]['FWHM_IMAGE']))
+    
+    
+    #Fig 1
+    
     fig1 = plt.figure(figsize=(14, 16))
     fig1.subplots_adjust(wspace=0.05, left=0.1, right=0.95,
                         bottom=0.15, top=0.9)
@@ -143,11 +145,13 @@ def get_plots(catfilepath,gxyra,gxydec,gxyid,gxy_name) :
     plt.ylabel('N: compact')
     #plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name}_part2_rgc.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig1)
-    ##############################################################
-    #PLOT
-    #Create figure and subplots
+    
+    
+    #Fig 2
+   
     fig2 = plt.figure(figsize=(14, 16))
     fig2.subplots_adjust(wspace=0.05, left=0.1, right=0.95,
                         bottom=0.15, top=0.9)
@@ -174,6 +178,7 @@ def get_plots(catfilepath,gxyra,gxydec,gxyid,gxy_name) :
     plt.grid()
     
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name}_part2_ci.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig2)
 
@@ -1964,36 +1969,70 @@ def corner_bkg(mdata, boxsize=100):
     rows=mdata.shape[0]
     cols=mdata.shape[1]
     
+    
     meanLL, medianLL, stdLL = sigma_clipped_stats(mdata[0:boxsize,0:boxsize], sigma=3.0)
     flagLL=0
-    print('LL corner Mean/Median/STD 3sigma',(meanLL, medianLL, stdLL))
+    print('LL corner Mean/Median/STD 3sigma',(meanLL, medianLL, stdLL),'\n\n')
     if (abs(medianLL)>abs(stdLL)) :
-        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
+        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA",'\n\n')
         flagLL=1
         
     
     meanLR, medianLR, stdLR = sigma_clipped_stats(mdata[0:boxsize,cols-boxsize:cols], sigma=3.0)
     flagLR=0
-    print('LR corner Mean/Median/STD 3sigma',(meanLR, medianLR, stdLR))  
+    print('LR corner Mean/Median/STD 3sigma',(meanLR, medianLR, stdLR),'\n\n')  
     if (abs(medianLR)>abs(stdLR)) :
-        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
+        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA",'\n\n')
         flagLR=1
     
     meanUL, medianUL, stdUL = sigma_clipped_stats(mdata[rows-boxsize:rows,0:boxsize], sigma=3.0)
     flagUL=0
-    print('UL corner Mean/Median/STD 3sigma',(meanUL, medianUL, stdUL))
+    print('UL corner Mean/Median/STD 3sigma',(meanUL, medianUL, stdUL),'\n\n')
     if (abs(medianUL)>abs(stdUL)) :
-        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
+        print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA",'\n\n')
         flagUL=1
      
     meanUL, medianUR, stdUR = sigma_clipped_stats(mdata[rows-boxsize:rows,cols-boxsize:cols], sigma=3.0)
     flagUR=0
-    print('UR corner Mean/Median/STD 3sigma',(meanUL, medianUR, stdUR))  
+    print('UR corner Mean/Median/STD 3sigma',(meanUL, medianUR, stdUR),'\n\n')  
     if (abs(medianUR)>abs(stdUR)) :
         print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
         flagUR=1
     
     return np.array([medianLL,medianLR,medianUL,medianUR]), np.array([flagLL,flagLR,flagUL,flagUR])
+
+def corner_bkg_iter(mdata, boxsize=100):
+    import random
+    
+    rows=mdata.shape[0]
+    cols=mdata.shape[1]
+    median=[[],[],[],[],[]]
+    for i in range(0,100):
+        box_pos=random.randint(0,100)
+        
+        meanLL, medianLL, stdLL = sigma_clipped_stats(mdata[0:boxsize,0:boxsize], sigma=3.0)
+        median[0].append(medianLL)
+        flagLL=0
+        
+            
+        
+        meanLR, medianLR, stdLR = sigma_clipped_stats(mdata[0:boxsize,cols-boxsize:cols], sigma=3.0)
+        median[1].append(medianLR)
+        flagLR=0
+          
+        
+        
+        meanUL, medianUL, stdUL = sigma_clipped_stats(mdata[rows-boxsize:rows,0:boxsize], sigma=3.0)
+        median[2].append(medianUL)
+        flagUL=0
+        
+         
+        meanUL, medianUR, stdUR = sigma_clipped_stats(mdata[rows-boxsize:rows,cols-boxsize:cols], sigma=3.0)
+        median[3].append(medianUR)
+        flagUR=0
+        
+    print(np.array([np.median(median[0]),np.median(median[1]),np.median(median[2]),np.median(median[3])]))
+    return np.array([np.median(median[0]),np.median(median[1]),np.median(median[2]),np.median(median[3])]), np.array([flagLL,flagLR,flagUL,flagUR])
 
 def corner_median(mdata, frac):
     
