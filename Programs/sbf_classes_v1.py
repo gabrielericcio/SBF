@@ -214,76 +214,11 @@ def run_part1(rms=0, remove_bkg=False) :
     masked_data=np.ma.masked_equal(masked_data,0) 
     utils.get_stats(masked_data)
     
-    #Get the four corners background
-    boxsize_bkg=100      #int(0.1*np.mean(masked_data.shape))
-    med_corners,flags_corners=utils.corner_bkg(masked_data,boxsize_bkg)
-    
-    #Background removal if requested
-    if (remove_bkg):
-        # print(np.multiply(med_corners, flags_corners))
-        # image_data=image_data-np.median(np.multiply(med_corners, flags_corners))
-        image_data=image_data-0.163#np.median(med_corners)
-        print(f"BACKGROUND SUBTRACTED={np.median(med_corners)}")
-        print("WARNING: BKG SETUP FOR VCC1146 ONLY",'\n\n' )
-    
-    # Save background subtracted image data
-    
-    fits.writeto(galimg, image_data, header=hdu[img_ext].header, overwrite=True)
-    
-
-
-    
-    #Dry ellipse model to get the best initialization parameters
-    
-    #Geometry modeling
-    tini_g=time.time()
-    geo0 = EllipseGeometry(x0=x0, y0=y0, sma=sma0, eps=eps0, pa=pa0, astep=agxy/3,
-                    linear_growth=False, fix_center=False, fix_pa=False, fix_eps=False)
-    tend_g=time.time()
-    print('Initial Geometry model', "Fit time in seconds : %6.3f" %(tend_g-tini_g),'\n\n' )
-    
-    #Ellipse modeling
-    tini_e=time.time()
-    ellipse = Ellipse(masked_data, geometry=geo0,threshold=0.1)
-    tend_e=time.time()
-    print('Initial Ellipse model',"Fit time in seconds : %6.3f" %(tend_e-tini_e),'\n\n' )
-    
-    #Isophote generation
-    tini_i=time.time()
-    isolist = ellipse.fit_image(minsma=minsma0, maxsma=maxsma0, maxit=maxit, maxgerr=0.5, fflag=0.7,
-                                 maxrit=None, sclip=sclip, nclip=nclip)
-    
-    t0=isolist.to_table()
-    tend_i=time.time()
-    print('Initial Isophotes',"Fit time in seconds : %6.3f" %(tend_i-tini_i),'\n\n' )
-    
-    if len(t0)>0:
-        smagxy=np.median(t0['sma'])
-        pagxy=float(str(np.median(t0['pa']))[0:4])*np.pi/180.
-        epsgxy=np.median(t0['ellipticity'])
-        xgxy=np.median(t0['x0'])
-        ygxy=np.median(t0['y0'])
-        print ('INITIAL galaxy median parameters : SMA0 = %5.0f, PA0 = %5.0f deg, ellip = %5.2f' %(smagxy, pagxy*180/np.pi, epsgxy),'\n\n' )
-    else:   
-        smagxy=sma0
-        pagxy=pa0
-        epsgxy=eps0
-        xgxy=x0
-        ygxy=y0
-        print('Did not run the zero-th ellipse model')
-        
-    #Draw an ellipse with initial guesses
-    aper = EllipticalAperture((xgxy, ygxy), smagxy, smagxy*(1 - epsgxy), pagxy)
-    
-     
-    
     # Generate a Mask with SExtractor  - We mask only the 15 brightest objects within  a given region
 
     # Get a Mask of extended sources using Sextractor
     # Run sextractor to get background subtracted image
     # On background subtracted image, run sextractor to generate list of compact objects
-    
-    
     
     # Generate sextractor file using sewpy 
     
@@ -338,8 +273,6 @@ def run_part1(rms=0, remove_bkg=False) :
             mask_reg_ext=np.logical_or(mask_reg_ext,region).astype(np.int32)
         
          
-
-    
     # Sextractor run for background
     
     sew_mback=sewpy.SEW(workdir=f'../OUTPUT/{gxyid}', sexpath="sex", configfilepath='../INPUT/UTILS/sewpy_lsst_back.par',
@@ -446,6 +379,70 @@ def run_part1(rms=0, remove_bkg=False) :
     tmid=time.time()
     print ("SExtractor total runtime in seconds : %6.3f" %(tmid-start_time),'\n\n' )
     
+    #Get the four corners background
+    boxsize_bkg=100      #int(0.1*np.mean(masked_data.shape))
+    
+    med_corners,flags_corners=utils.corner_bkg(masked_data,boxsize_bkg)
+    
+    #Background removal if requested
+    if (remove_bkg):
+        #print(np.multiply(med_corners, flags_corners))
+        # image_data=image_data-np.median(np.multiply(med_corners, flags_corners))
+        #image_data=image_data-np.median(med_corners)
+        masked_data=masked_data-np.median(med_corners)#0.163
+        print(f"BACKGROUND SUBTRACTED={np.median(med_corners)}")
+        print("WARNING: BKG SETUP FOR VCC1146 ONLY",'\n\n' )
+    
+    # Save background subtracted image data
+    
+    fits.writeto(galimg, image_data, header=hdu[img_ext].header, overwrite=True)
+    
+
+
+    
+    #Dry ellipse model to get the best initialization parameters
+    
+    #Geometry modeling
+    tini_g=time.time()
+    geo0 = EllipseGeometry(x0=x0, y0=y0, sma=sma0, eps=eps0, pa=pa0, astep=agxy/3,
+                    linear_growth=False, fix_center=False, fix_pa=False, fix_eps=False)
+    tend_g=time.time()
+    print('Initial Geometry model', "Fit time in seconds : %6.3f" %(tend_g-tini_g),'\n\n' )
+    
+    #Ellipse modeling
+    tini_e=time.time()
+    ellipse = Ellipse(masked_data, geometry=geo0,threshold=0.1)
+    tend_e=time.time()
+    print('Initial Ellipse model',"Fit time in seconds : %6.3f" %(tend_e-tini_e),'\n\n' )
+    
+    #Isophote generation
+    tini_i=time.time()
+    isolist = ellipse.fit_image(minsma=minsma0, maxsma=maxsma0, maxit=maxit, maxgerr=0.5, fflag=0.7,
+                                 maxrit=None, sclip=sclip, nclip=nclip)
+    
+    t0=isolist.to_table()
+    tend_i=time.time()
+    print('Initial Isophotes',"Fit time in seconds : %6.3f" %(tend_i-tini_i),'\n\n' )
+    
+    if len(t0)>0:
+        smagxy=np.median(t0['sma'])
+        pagxy=float(str(np.median(t0['pa']))[0:4])*np.pi/180.
+        epsgxy=np.median(t0['ellipticity'])
+        xgxy=np.median(t0['x0'])
+        ygxy=np.median(t0['y0'])
+        print ('INITIAL galaxy median parameters : SMA0 = %5.0f, PA0 = %5.0f deg, ellip = %5.2f' %(smagxy, pagxy*180/np.pi, epsgxy),'\n\n' )
+    else:   
+        smagxy=sma0
+        pagxy=pa0
+        epsgxy=eps0
+        xgxy=x0
+        ygxy=y0
+        print('Did not run the zero-th ellipse model')
+        
+    #Draw an ellipse with initial guesses
+    aper = EllipticalAperture((xgxy, ygxy), smagxy, smagxy*(1 - epsgxy), pagxy)
+    
+    
     
     
     # Galaxy final Modeling, starting from the initial values calculated before
@@ -509,6 +506,8 @@ def run_part1(rms=0, remove_bkg=False) :
         
         
         # Plots initialization
+        import matplotlib.patches as patches
+        from PIL import Image
         
         fig = plt.figure(figsize=(14, 16))
         fig.subplots_adjust(wspace=0.05, left=0.1, right=0.95,
@@ -519,9 +518,10 @@ def run_part1(rms=0, remove_bkg=False) :
         if (vmin>vmax) : vmax=10.*vmin
         
         plt.subplot(221)
-        plt.xlim(xgxy-box, xgxy+box)
-        plt.ylim(ygxy-box, ygxy+box)
+        #plt.xlim(xgxy-box, xgxy+box)
+        #plt.ylim(ygxy-box, ygxy+box)
         plt.imshow(image_data, origin='lower', norm=LogNorm(vmin=vmin, vmax=vmax), cmap=cmap)
+        #plt.add_patch(rect)
         
         plt.subplot(222)
         plt.xlim(xgxy-box, xgxy+box)
