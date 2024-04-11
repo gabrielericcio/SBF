@@ -206,7 +206,6 @@ def sbf_match_catalogs(cat1path,cat2path,rad_asec):
     
     skycoord_1=SkyCoord(tsex1['ALPHA_J2000'],tsex1['DELTA_J2000'],unit=(u.deg, u.deg))
     skycoord_2=SkyCoord(tsex2['ALPHA_J2000'],tsex2['DELTA_J2000'],unit=(u.deg, u.deg))
-    
     idx1, idx2, d2d, d3d = skycoord_2.search_around_sky(skycoord_1,rad_asec*u.arcsec)
     #print(len(idx1),len(idx2),len(d2d), idx1)
     
@@ -453,68 +452,84 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     font = {'family' : 'serif',
         'weight' : 'normal',
         'size'   : 16}
-
     plt.rc('font', **font)
+    
+    #load catalog
     tsex = Table.read(catfilepath, format='ascii')
-    ttmp=tsex[(tsex['MAG_APER_11']>mbright) &(tsex['MAG_APER_11']<mfaint) & (tsex['CLASS_STAR']>csmin)] 
+    
+    #Source selection ttmp: big aperture not too bright, not too faint, stars
+    ttmp=tsex[(tsex['MAG_APER_11']>mbright) & (tsex['MAG_APER_11']<mfaint) & (tsex['CLASS_STAR']>csmin)] 
+    
+    #Rough aperture correction
     apc_rough=ttmp['MAG_APER_1']-ttmp['MAG_APER_11']
     none, apc_med, apc_std=sigma_clipped_stats(apc_rough,sigma=3)
-    print('Median ApC starting value', apc_med, apc_std)
+    print('Median ApC starting value', apc_med, apc_std, '\n\n')
 
-     
+    #Coordinates rearrange
     skycoord_full=SkyCoord(tsex['ALPHA_J2000'],tsex['DELTA_J2000'],unit=(u.deg, u.deg))
-
-    tclean=tsex[(tsex['MAG_AUTO']<threshold) & (tsex['MAG_APER_1']<threshold) & (tsex['MAG_APER_2']<threshold) & (tsex['MAG_APER_11']<threshold)]
-    #print('tclean[MAG_APER]',tclean['MAG_APER'])
-    #print('len(tclean)',len(tclean))
-    tclean_cpt=tclean[(tclean['CLASS_STAR']>csmin)& (tclean['FLAGS']==0)]
-    #print('len(tclean_cpt)',len(tclean_cpt))
-    #print('tclean_cpt[MAG_APER]',tclean_cpt['MAG_APER'])
-    ci_cpt=(tclean_cpt['MAG_APER']-tclean_cpt['MAG_APER_2'])
-    #print(ci_cpt)
-    # print(len(tsex),len(tclean),len(tclean_cpt))
     
+    #Source selection clean: No aperture magnitude fainter than threshold
+    tclean=tsex[(tsex['MAG_AUTO']<threshold) & (tsex['MAG_APER_1']<threshold) & (tsex['MAG_APER_2']<threshold) & (tsex['MAG_APER_11']<threshold)]
+    
+    #Source selection clean and compact: compact and no problems with sextractor
+    tclean_cpt=tclean[(tclean['CLASS_STAR']>csmin)& (tclean['FLAGS']==0)]
+    
+    #Magnitude difference for aperture 2-0: Compact sources
+    ci_cpt=(tclean_cpt['MAG_APER']-tclean_cpt['MAG_APER_2'])
+    
+    #Magnitude difference for aperture 2-0: clean sources
     ci=tclean['MAG_APER']-tclean['MAG_APER_2']
+    
+    #Maximum and minimum values of Magnitude difference for aperture 2-0
     ci_high=np.median(ci_cpt)+mad(ci_cpt)*1.48*3
     ci_low=np.median(ci_cpt)-mad(ci_cpt)*1.48*3
-    cpt_cond=((tclean['CLASS_STAR']>csmin) & (ci>=ci_low) & (ci<=ci_high))
+    
+    
+    #Conditions for aperture correction: clean, compact and adeguate for aperture correction
     apercorr_cond=((tclean['CLASS_STAR']>csmin)& (tclean['FLAGS']==0) & (ci>=ci_low) & (ci<=ci_high) &
                    ((tclean['MAG_APER_1']-tclean['MAG_APER_11'])<(apc_med+apc_std))&((tclean['MAG_APER_1']-tclean['MAG_APER_11'])>(apc_med-apc_std)))
     
+    #Source seelection: clean, compact and adeguate for aperture correction
     tclean_cpt=tclean[apercorr_cond]
     
-    #print(len(tsex),len(tclean_cpt))
-   
+    #Source selection: MAG_AUTO bright, clean, compact and adeguate for aperture correction
     tbright_cpt=tclean_cpt[(tclean_cpt['MAG_AUTO']<mfaint) & (tclean_cpt['MAG_AUTO']>mbright)]
-    
+
+    #Parte inutile, solo rinominare selezione gia fatta
     tsel=tbright_cpt#tsex[(tsex['CLASS_STAR']>csmin) & (tsex['FLAGS']==0) & (tsex['MAG_AUTO']<mfaint) & (tsex['MAG_AUTO']>mbright) ]
     tsel=tsel[((tsel['MAG_APER_1']-tsel['MAG_APER_11'])<(apc_med+apc_std))&((tsel['MAG_APER_1']-tsel['MAG_APER_11'])>(apc_med-apc_std))]
+    
+    #Matching with the full sample
     skycoord_sel=SkyCoord(tsel['ALPHA_J2000'],tsel['DELTA_J2000'],unit=(u.deg, u.deg))
     idxsel, idxfull, d2d, d3d = skycoord_full.search_around_sky(skycoord_sel,rad_asec*u.arcsec)
     
+    #Source selection: taking isolated sources, i.e. alone in the matching radius
     un, c = np.unique(idxsel, return_counts=True)
     non_dup = un[c == 1]
     #tnew=np.delete(tsel,dup)
     tnew=tsel[non_dup]
-    print('len(tnew)',len(tnew))
+    print('len(tnew)',len(tnew), '\n\n')
     #tnew=tnew[(tnew['MAG_APER_11']<threshold)& (tnew['MAG_AUTO']<mfaint) & (tnew['MAG_AUTO']>mbright)]
     # print(len(tsex),len(tnew))
-
+    
+    #List definition
     mag4=tnew['MAG_APER']
     mag6=tnew['MAG_APER_1']
     mag32=tnew['MAG_APER_11']
-    print('len(mags)',len(mag4),len(mag6),len(mag32))
-    
-    
     
     mag6_full=tclean_cpt['MAG_APER_1']
-    print('len(mag6_full)',len(mag6_full))
+    print('len(mags)',len(mag4),len(mag6),len(mag32))
+    print('len(mag6_full)',len(mag6_full),'\n\n')
+    
     apers=[4,6,8,10,12,14,16,20,24,26,28,32]
     
-    #Curve of growth for entire sample and the selected objects
+    #Curve of growth for entire sample and the selected objects (clean and compact)
+    
+    
     cog_full=[]
     cog_sel=[]
-
+    
+    #Build the list of magnitude differences from the magnitude at 6 pixel 
     for i in range(1,len(apers)) :
         mag_i_str='MAG_APER_'+str(i)
         mag_i_full=tclean_cpt[mag_i_str]
@@ -522,33 +537,130 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
         cog_full.append(np.median(mag6_full[mag_i_full<threshold]-mag_i_full[mag_i_full<threshold]))
         cog_sel.append(np.median(mag6[mag_i<threshold]-mag_i[mag_i<threshold]))
     
-    # def func_linear(x,a,b):
-    #     return a*x+b
+    def power_law(x,a,b):
+         return a*(x**b)
+
+    def inverse_power(y,*par):
+        return (y / par[0]) ** (1 / par[1])
+    
+    
+    #Curve of Growth fit 
+    
+    #Nandini method
+    
+    #Log function definition    
     sigmalin = lambda x,a,b: np.sum(10**(func_linear(x,a,b)))
+    
+    #Rearrange fit variables
     cog_sel=np.array(cog_sel)
     print('len(cog_sel)',len(cog_sel))
+    print('cog_sel',cog_sel)
     d_cog=cog_sel[1:]-cog_sel[:-1]
+    print('d_cog', d_cog, sum(d_cog))
+    print(np.cumsum(d_cog))
     cond=(d_cog>0)
     x=np.array(apers[1:-1])[cond]
-    y=np.log(d_cog)[cond]
-    print('len(y)',len(y))
-    print('len(x)',len(x))
-    # print(x,y)
+    print('x', x)
+    y=np.log10(d_cog)[cond] #nandini here put log normal
+    print('y', y,)
+    
+    #Linear fit
     guess_a=-1.
     guess_b=-4
     popt_asymlin,pcov_asymlin = curve_fit(func_linear,x,y,p0=[guess_a,guess_b])
+    
+    plt.plot(x,y)
+    plt.plot(x, func_linear(x,*popt_asymlin), color='red', label='Fitted Line')
+    # plt.plot(x, power_law(x,*popt_asympow), color='red', label='Fitted Line')
+    plt.show()
+    
+    #Asymptote calculation
     asym=cog_sel[-1]+sigmalin(x*2,*popt_asymlin)
+    print('sigmalin(x*2,*popt_asymlin)',sigmalin(x*2,*popt_asymlin),'\n\n')
+    
+    aper_corr=asym #np.median(mag6-mag32) #asym 
+    
+    print('Nandini aperture corr', aper_corr,'\n\n')
     
     
-    #asym=np.median(cog_sel[7:11]) #Asymptote : median of apertures 24 to 48
+    #Gabriele method
+    
+    #Power law fit
+    
+    popt_asympow,pcov_asympow = curve_fit(power_law,x,d_cog[cond])
+    #print('popt_asympow',popt_asympow, np.sum(d_cog))
+   
+    #Aperture value for the difference <threshold
+    
+    thr=0.0075 
+    
+    aper_asym=inverse_power(thr,*popt_asympow)
+    print('Aperture at asymptote',aper_asym)
+    apertures=np.arange(6, aper_asym,0.01)
+    spacing=np.mean(apertures[1:]-apertures[:-1])
+    print('spacing',spacing)
+    asymptote=np.trapz(np.array(power_law(apertures,*popt_asympow )),apertures)*0.5 #Divided by 2 considering trapezoidal integral method
+    aper_corr= asymptote
+    print('Gabriele aperture corr', aper_corr,'\n\n')
+    
+    #test 
+    apertures=np.linspace(6, aper_asym, 7)
+    asymptote=np.sum(np.array(power_law(apertures,*popt_asympow )))
+    print('test', asymptote,'\n\n')
+    
+    print('Final aper_corr', aper_corr,'\n\n')
+    
+    
+    fwhm=np.median(tnew['FWHM_IMAGE'])
+    sfwhm=np.std(tnew['FWHM_IMAGE'])
+    #tnew.write("test_tnew_"+gname+".cat",format='ascii',overwrite=True)
+    #tbright_cpt.write("test_tbrightcpt_"+gname+".cat",format='ascii',overwrite=True)
+    print('Median FWHM +/- err',fwhm,sfwhm,'\n\n')
+    
+    #Again conditions for final catalog corrected for aperture
+    ci=tsex['MAG_APER']-tsex['MAG_APER_2']
+    ci_high=np.median(ci_cpt)+mad(ci_cpt)*1.48*3
+    ci_low=np.median(ci_cpt)-mad(ci_cpt)*1.48*3
+    cpt_cond=((tsex['CLASS_STAR']>csmin) & (ci>=ci_low) & (ci<=ci_high))
+    
+    #Application of aperture correction
+    mag_corr=np.where(cpt_cond,tsex['MAG_APER_1']-aper_corr,tsex['MAG_AUTO'])#=tsex[np.where(cpt_cond)]['MAG_APER_1']+aper_corr
+    tsex['MAG_CORR']=mag_corr
+    
+    
+    
+    
+    #Plots
+    
+    #Power law fit of the decrement in the magnitude differences
+    
+    
+    plt.scatter(x,d_cog[cond])
+    
+    plt.plot(apertures, power_law(apertures,*popt_asympow ), color='blue', label='Fitted Line')
+    plt.xlabel('Aperture')
+    plt.ylabel('Decrement in $\Delta mag$ ')
+    # plt.plot(x, power_law(x,*popt_asympow), color='red', label='Fitted Line')
+    plt.plot((0,60),(0,0), ls='--', color='r')
+    plt.plot((aper_asym,aper_asym),(0,d_cog[cond][0]), color='black', ls='--')
+    plt.show()
+    
+    
+    
+    
     fig = plt.figure(figsize=(10,6))
     fig.subplots_adjust(wspace=0.4,hspace=0.4, left=0.15, right=0.98,
                             bottom=0.15, top=0.9)
     font = {'family' : 'serif',
         'weight' : 'normal',
         'size'   : 20}
-
     plt.rc('font', **font)
+    
+    
+    
+    
+    
+    #Curve of growth
 
     ax1 = plt.subplot(121)
     plt.title(gxy_name)
@@ -557,6 +669,7 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     plt.scatter(apers[1:],cog_full,color='lightcoral',marker='X',s=400,label='Bright')
     plt.scatter(apers[1:],cog_sel,color='darkgreen',s=150,label='Bright isolated')
     plt.axhline(asym,linestyle='--',color='darkgreen')
+    plt.axhline(asymptote,linestyle='--',color='red')
     trans = transforms.blended_transform_factory(ax1.get_yticklabels()[0].get_transform(), ax1.transData)
     plt.text(0.2,asym-0.05, "{:4.3f}".format(asym), color="darkgreen",ha="right", va="center",transform=trans)
     plt.legend()
@@ -590,30 +703,18 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     #plt.show(block=False)
     #plt.clf()
     
-    aper_corr=asym #np.median(mag6-mag32) #asym 
-    print('Final aper_corr', aper_corr)
-    fwhm=np.median(tnew['FWHM_IMAGE'])
-    sfwhm=np.std(tnew['FWHM_IMAGE'])
-    #tnew.write("test_tnew_"+gname+".cat",format='ascii',overwrite=True)
-    #tbright_cpt.write("test_tbrightcpt_"+gname+".cat",format='ascii',overwrite=True)
-    print('Median FWHM +/- err',fwhm,sfwhm)
-    
-    ci=tsex['MAG_APER']-tsex['MAG_APER_2']
-    ci_high=np.median(ci_cpt)+mad(ci_cpt)*1.48*3
-    ci_low=np.median(ci_cpt)-mad(ci_cpt)*1.48*3
-    cpt_cond=((tsex['CLASS_STAR']>csmin) & (ci>=ci_low) & (ci<=ci_high))
     
     # plt.scatter(tsex['MAG_AUTO'],tsex['MAG_AUTO']-tsex['MAG_APER_1'])
     # #plt.show(block=False)
     # #plt.clf()
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name}_apercorr.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig)
 
     #mag_corr=tsex['MAG_AUTO']
     #print(mag_corr)
-    mag_corr=np.where(cpt_cond,tsex['MAG_APER_1']-aper_corr,tsex['MAG_AUTO'])#=tsex[np.where(cpt_cond)]['MAG_APER_1']+aper_corr
-    tsex['MAG_CORR']=mag_corr
+   
     # plt.scatter(tsex['MAG_CORR'],tsex['MAG_AUTO']-tsex['MAG_CORR'])
     # #plt.show(block=False)
     # #plt.clf()
@@ -1942,22 +2043,22 @@ def get_stats(mdata):
     cols=mdata.shape[1]
     
     mean, median, std = sigma_clipped_stats(mdata[0:100,0:100], sigma=3.0)
-    print('LL corner Mean/Median/STD 3sigma',(mean, median, std))
+    #print('LL corner Mean/Median/STD 3sigma',(mean, median, std))
     if (abs(median)>abs(std)) :
         print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
     
     mean, median, std = sigma_clipped_stats(mdata[0:100,cols-100:cols], sigma=3.0)
-    print('LR corner Mean/Median/STD 3sigma',(mean, median, std))  
+    #print('LR corner Mean/Median/STD 3sigma',(mean, median, std))  
     if (abs(median)>abs(std)) :
         print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
     
     mean, median, std = sigma_clipped_stats(mdata[rows-100:rows,0:100], sigma=3.0)
-    print('UL corner Mean/Median/STD 3sigma',(mean, median, std))
+    #print('UL corner Mean/Median/STD 3sigma',(mean, median, std))
     if (abs(median)>abs(std)) :
         print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
      
     mean, median, std = sigma_clipped_stats(mdata[rows-100:rows,cols-100:cols], sigma=3.0)
-    print('UR corner Mean/Median/STD 3sigma',(mean, median, std))  
+    #print('UR corner Mean/Median/STD 3sigma',(mean, median, std))  
     if (abs(median)>abs(std)) :
         print("WARNING : THE MEDIAN BACKGROUND IS LARGER THAN THE SIGMA")
 
