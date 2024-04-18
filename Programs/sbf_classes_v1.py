@@ -673,8 +673,6 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     
     '''
     
-    
-    #############################
     #Start the time and see how long it takes 
     start_time = time.time()
     
@@ -690,7 +688,9 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     gxyid=gxyid.upper()
     
     #Read the catalogs in the 2 bands of interest
+    
     gxy_name1=gxyid+'_'+band1
+    print('Name g catalog', gxy_name1)
     cat1path="../OUTPUT/"+gxyid+'/'+gxy_name1+'.cat'
     # resimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_res.fits' #residual image file path
     # modimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mod.fits' #model image file path
@@ -699,6 +699,7 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     # t1 = Table.read(cat1path, format='ascii.sextractor')
 
     gxy_name2=gxyid+'_'+band2
+    print('Name 1 catalog', gxy_name2)
     cat2path="../OUTPUT/"+gxyid+'/'+gxy_name2+'.cat'
     # resimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_res.fits' #residual image file path
     # modimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mod.fits' #residual image file path
@@ -711,9 +712,11 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
         os.makedirs("../OUTPUT/plots/"+gxyid)
 
     #Apply extinction corrections to the 2 catalogs
+    
     corr_tsex1=utils.corr_catalog(cat1path, 'MAG_APER_1', 0, ext_corr1)
     cat1path="../OUTPUT/"+gxyid+'/'+gxy_name1+'_extcorr.cat'
     corr_tsex1.write(cat1path,format='ascii',overwrite=True)
+    
     corr_tsex2=utils.corr_catalog(cat2path, 'MAG_APER_1', 0, ext_corr2)
     cat2path="../OUTPUT/"+gxyid+'/'+gxy_name2+'_extcorr.cat'
     corr_tsex2.write(cat2path,format='ascii',overwrite=True)
@@ -722,9 +725,10 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     #print(fwhm1,fwhm2)
     rad_asec=np.mean([fwhm1,fwhm2])*match_scale#1.2
     # threshold=35 # 50 HSC
+    
     tmatch_all1,tmatch_all2=utils.sbf_match_catalogs(cat1path, cat2path, rad_asec)
-    match1path='../OUTPUT/'+gxyid+'/'+band1+'_matched.cat'
-    match2path='../OUTPUT/'+gxyid+'/'+band2+'_matched.cat'
+    match1path='../OUTPUT/'+gxyid+'/'+gxy_name1+'_matched.cat'
+    match2path='../OUTPUT/'+gxyid+'/'+gxy_name2+'_matched.cat'
     tmatch_all1.write(match1path,format='ascii',overwrite=True)
     tmatch_all2.write(match2path,format='ascii',overwrite=True)
 
@@ -735,27 +739,28 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
 
 
     #Compute and apply aperture correction to matched, clean catalogs
+    
     aper_corr1, tcorr1=utils.sbf_aper_corr(match1path,rad_asec,gxyid, band1,csmin,mfaint,mbright,threshold)
     aper_corr2, tcorr2=utils.sbf_aper_corr(match2path,rad_asec,gxyid, band2,csmin,mfaint,mbright,threshold)
     # aper_corr1, tcorr1=utils.sbf_aper_corr(match1path,rad_asec,gxy_name1,csmin,mfaint,mbright,threshold)
     # aper_corr2, tcorr2=utils.sbf_aper_corr(match2path,rad_asec,gxy_name2,csmin,mfaint,mbright,threshold)
-    match1path='../OUTPUT/'+gxyid+'/'+band1+'_matchedcorr.cat'
-    match2path='../OUTPUT/'+gxyid+'/'+band2+'_matchedcorr.cat'
+    match1path='../OUTPUT/'+gxyid+'/'+gxy_name1+'_matchedcorr.cat'
+    match2path='../OUTPUT/'+gxyid+'/'+gxy_name2+'_matchedcorr.cat'
     tcorr1.write(match1path,format='ascii.commented_header',overwrite=True)
     tcorr2.write(match2path,format='ascii.commented_header',overwrite=True)
 
 
-#ARRIVATO QUI
-
     
-    ############# Read isophotes and find R_e of galaxy
+    #Effective raiuds calculation of g image
     sigmalin = lambda x,a,b: np.sum((utils.func_linear(x,a,b)))
     
 
-    
+    #Read isophotes
     isofilepath1="../OUTPUT/"+gxyid+'/'+gxy_name1+'.iso'
     isophotes1=Table.read(isofilepath1,format='ascii')
     # print(isophotes1)
+    
+    #Parameters arrangment
     sma=isophotes1['sma']*plate_scale
     tflux_e=isophotes1['tflux_e']
     clean_nan=(np.isfinite(tflux_e))
@@ -766,8 +771,9 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     # m_V=magzp_V-2.5*np.log10(tot_flux_V)
     # m_g=magzp_g-2.5*np.log10(tot_flux_g)
     # d_V=m_V[:-1]-m_V[1:]
-    
     # print(tflux_e)
+    
+    #CoG of the isophotes
     diff=tflux_e[1:]-tflux_e[:-1]
     cond=(diff>0)
     x=np.array(sma[:-1])
@@ -780,15 +786,19 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     # plt.plot(x,diff)
     # plt.show()
     # plt.clf()
-
+    
+    #Linear fit
     popt_asymlin,pcov_asymlin = curve_fit(utils.func_linear,x,y,p0=[guess_a,guess_b])
     
-    # print(popt_asymlin)
+    #Asymptote calculation
+    asym=tflux_e[-1]+sigmalin(x*2,*popt_asymlin)
+    re1=sma[np.abs(tflux_e-0.5*asym).argmin()]
+    
+    
+    #Plot
     plt.plot(sma,tflux_e)
     ax=plt.gca()
     # ax.invert_yaxis()
-    asym=tflux_e[-1]+sigmalin(x*2,*popt_asymlin)
-    re1=sma[np.abs(tflux_e-0.5*asym).argmin()]
     trans = transforms.blended_transform_factory(ax.get_yticklabels()[0].get_transform(), ax.transData)
     plt.text(0.8,asym/1.5, f"R_e={round(re1,3)} asec", color="red",ha="right", va="center",transform=trans)
     plt.axhline(asym,color='red')
@@ -797,15 +807,19 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     #plt.show(block=False)
     ##plt.clf()
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_R_e.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
     
-    ### Calculate effective radius of galaxy
+    #Calculate effective radius of galaxy
     print(asym)
     print("R_E in "+str(band1)+" is",sma[np.abs(tflux_e-0.5*asym).argmin()])
     
     
     
+    #Effective radius calculation of i image
+    
+    #Read Isopghotes
     isofilepath2="../OUTPUT/"+gxyid+'/'+gxy_name2+'.iso'
     isophotes2=Table.read(isofilepath2,format='ascii')
     # print(isophotes1)
@@ -816,10 +830,7 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     tflux_e=tflux_e[(clean_nan)]
 
     
-    # m_V=magzp_V-2.5*np.log10(tot_flux_V)
-    # m_g=magzp_g-2.5*np.log10(tot_flux_g)
-    # d_V=m_V[:-1]-m_V[1:]
-    
+    #CoG of the isophotes
     diff=tflux_e[1:]-tflux_e[:-1]
     cond=(diff>0)
     x=np.array(sma[:-1])
@@ -828,14 +839,20 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     y=np.log(diff)
     guess_a=-1.
     guess_b=-4
+    
+    #Linear fit
     popt_asymlin,pcov_asymlin = curve_fit(utils.func_linear,x,y,p0=[guess_a,guess_b])
     
+    #Asymptote estimation
+    asym=tflux_e[-1]+sigmalin(x*2,*popt_asymlin)
+    re2=sma[np.abs(tflux_e-0.5*asym).argmin()]
     # print(popt_asymlin)
+    
+    
+    #Plot
     plt.plot(sma,tflux_e)
     ax=plt.gca()
     # ax.invert_yaxis()
-    asym=tflux_e[-1]+sigmalin(x*2,*popt_asymlin)
-    re2=sma[np.abs(tflux_e-0.5*asym).argmin()]
     trans = transforms.blended_transform_factory(ax.get_yticklabels()[0].get_transform(), ax.transData)
     plt.text(0.8,asym/1.5, f"R_e={round(re2,3)} asec", color="red",ha="right", va="center",transform=trans)
     plt.axhline(asym,color='red')
@@ -850,9 +867,8 @@ def run_part3(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     print(asym)
     print("R_E in "+str(band2)+" is",sma[np.abs(tflux_e-0.5*asym).argmin()])
     
-    #### R_E of galaxy: half-light radius
-    
-    
+    # R_E of galaxy: half-light radius
+     
     r_e=np.mean([re1,re2])
     # r_e=re2
     print("Mean R_E is",r_e)
@@ -873,8 +889,6 @@ def run_part4(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, ext_corr2):
     
     '''
     
-    
-    #############################
     #Start the time and see how long it takes 
     # start_time = time.time()
     
@@ -893,37 +907,43 @@ def run_part4(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, ext_corr2):
     #Read the catalogs in the 2 bands of interest
     gxy_name1=gxyid+'_'+band1
     cat1path="../OUTPUT/"+gxyid+'/'+band1+'_matchedcorr.cat' #Matched corrected catalog
-    resimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_res.fits' #residual image file path
-    modimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mod.fits' #model image file path
-    galimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'.fits' #galaxy image
+    resimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_res.fits'     #residual image
+    modimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mod.fits'     #model image
+    galimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'.fits'         #galaxy image
     # maskimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mask.fits' #mask image  
-    whtimg1="../OUTPUT/"+gxyid+"/"+gxy_name1+'_revwht.fits'
+    whtimg1="../OUTPUT/"+gxyid+"/"+gxy_name1+'_revwht.fits'  #Weight image
     t1 = Table.read(cat1path, format='ascii.commented_header')
 
     gxy_name2=gxyid+'_'+band2
-    cat2path="../OUTPUT/"+gxyid+'/'+band2+'_matchedcorr.cat'
-    resimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_res.fits' #residual image file path
-    modimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mod.fits' #model image file path
-    galimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'.fits' #galaxy image
-    # maskimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mask.fits' #mask image
-    whtimg2="../OUTPUT/"+gxyid+"/"+gxy_name2+'_revwht.fits'
+    cat2path="../OUTPUT/"+gxyid+'/'+band2+'_matchedcorr.cat'#Matched corrected catalog
+    resimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_res.fits'    #residual image
+    modimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mod.fits'    #model image
+    galimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'.fits'        #galaxy image
+    # maskimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mask.fits'#mask image
+    whtimg2="../OUTPUT/"+gxyid+"/"+gxy_name2+'_revwht.fits' #Weight image
     t2 = Table.read(cat2path, format='ascii.commented_header')
-
+    
+    #Residual g cataog
     # img1=fits.open(galimg1, do_not_scale_image_data=True)
     res1=fits.open(resimg1, do_not_scale_image_data=True)
     resdata1=res1[res_ext].data
     reshdr1=res1[res_ext].header
     wcs1=WCS(reshdr1)
-
+    
+    #residual catalog i
     # img2=fits.open(galimg2, do_not_scale_image_data=True)
     res2=fits.open(resimg2, do_not_scale_image_data=True)
     res2.info()
-    mod2=fits.open(modimg2, do_not_scale_image_data=True)
-    mod2.info()
-    moddata2=mod2[res_ext].data
     resdata2=res2[res_ext].data
     reshdr2=res2[res_ext].header
     wcs2=WCS(reshdr2)
+    
+    #Model catalog
+    mod2=fits.open(modimg2, do_not_scale_image_data=True)
+    mod2.info()
+    moddata2=mod2[res_ext].data
+    
+    #Weight catalog
     wht2=fits.open(whtimg2, do_not_scale_image_data=True)
     wht2.info()
     whtdata2=wht2[wht_ext].data
@@ -932,11 +952,9 @@ def run_part4(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, ext_corr2):
     # GENERATE MASKS:
 
     print("Generating Catalog for P_r module")
-    # print(plate_scale)
-    # print(fwhm1/plate_scale)
-    # print(fwhm2/plate_scale)
+   
 
-    ################# Sextractor run for background
+    # Sextractor run for background g
     
     sewpyconf={"PARAMETERS_NAME":"../INPUT/UTILS/default.param.lsst",
                           "FILTER_NAME":"../INPUT/UTILS/gauss_3.0_5x5.conv",
@@ -956,14 +974,9 @@ def run_part4(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, ext_corr2):
                         config=sewpyconf,loglevel=None)
     
     out_mback=sew_mback(resimg1)
-    # t=Table.read(out_mback["catfilepath"], format='ascii.sextractor')
-    # t.write("../OUTPUT/"+gxyid+"/"+gxy_name1+"_mask.cat",format='ascii.commented_header',overwrite=True)
-    # tmask1 = Table.read("../OUTPUT/"+gxyid+"/"+gxy_name1+"_p_r.cat", format='ascii.commented_header')
     
-
-    # sbkg1=fits.open("../OUTPUT/"+gxyid+"/"+gxy_name1+"_sbkg.fits")
-    # mbkg1=resdata1-sbkg1[0].data
-    # fits.writeto("../OUTPUT/"+gxyid+"/"+gxy_name1+"_mbkg1.fits",mbkg1,overwrite=True)
+    
+    # Sextractor run for background i
 
     sewpyconf={"PARAMETERS_NAME":"../INPUT/UTILS/default.param.lsst",
                           "FILTER_NAME":"../INPUT/UTILS/gauss_3.0_5x5.conv",
@@ -977,7 +990,7 @@ def run_part4(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, ext_corr2):
                         #   "WEIGHT_IMAGE": whtimg2,
                           "CHECKIMAGE_NAME": "../OUTPUT/"+gxyid+"/"+gxy_name2+"_sbkg.fits, ../OUTPUT/"+gxyid+"/"+gxy_name2+"_mbkg.fits"
                           }
-
+    print('BACK_SIZE',int(10*fwhm2/plate_scale),)
     
     sew_mback=sewpy.SEW(workdir=f'../OUTPUT/{gxyid}', sexpath="sex", configfilepath='../INPUT/UTILS/sewpy_lsst_smoothbkg.par',
                         config=sewpyconf,loglevel=None)
@@ -999,15 +1012,13 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     '''
     
     
-    #############################
+    
     #Start the time and see how long it takes 
     start_time = time.time()
     
+    #Parameters initialization
     gxyid=gal.gxy
-    #gxyra=gal.gxyra
-    #gxydec=gal.gxydec
-    
-    # fwhm0= gal.fwhm0
+
     plate_scale=gal.plate_scale
     img_ext=gal.img_ext #Image extension
     wht_ext=gal.wht_ext #Weight extension
@@ -1015,20 +1026,23 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     gxyid=gxyid.upper()
     
     #Read the catalogs in the 2 bands of interest
+    
+    #g
     gxy_name1=gxyid+'_'+band1
     match1path="../OUTPUT/"+gxyid+'/'+band1+'_matchedcorr.cat' #Matched corrected catalog
-    mbkimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mbkg.fits' #bkg-subtracted residual image file path
-    
-    gxy_name2=gxyid+'_'+band2
-    match2path="../OUTPUT/"+gxyid+'/'+band2+'_matchedcorr.cat'
-    mbkimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mbkg.fits' #bkg-subtracted residual image file path
-
+    mbkimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mbkg.fits'      #bkg-subtracted residual image file path
+   
     mbk1=fits.open(mbkimg1, do_not_scale_image_data=True)
     # mask1=fits.open(maskimg1, do_not_scale_image_data=True)
     mbk1data=mbk1[res_ext].data
     # maskdata1=mask1[res_ext].data
     hdr1=mbk1[res_ext].header
     wcs1=WCS(hdr1)
+    
+    #i
+    gxy_name2=gxyid+'_'+band2
+    match2path="../OUTPUT/"+gxyid+'/'+band2+'_matchedcorr.cat'
+    mbkimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mbkg.fits'      #bkg-subtracted residual image file path
 
     mbk2=fits.open(mbkimg2, do_not_scale_image_data=True)
     # mask1=fits.open(maskimg1, do_not_scale_image_data=True)
@@ -1041,54 +1055,24 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
         os.makedirs("../OUTPUT/plots/"+gxyid)
 
     
-    ################# Generate EPSF
+    # Generate EPSF
     rad_asec=np.mean([fwhm1,fwhm2])*psf_rad_scale
-    # utils.twoband_psf(resimg1,res_ext,match1path,resimg2,res_ext,match2path,cscut,mfaint,mbright,rad_asec,threshold)
+    
     # epsf1,epsf2=utils.twoband_psf(resimg1,res_ext,match1path,resimg2,res_ext,match2path,
     #                               cscut,mfaint,mbright,rad_asec,threshold,psfsize,oversampling,
     #                               gxyid,gxy_name1,gxy_name2,nthfactor, rgc_factor)
+    
     epsf2=utils.twoband_psf_VCC(mbkimg1,res_ext,match1path,mbkimg2,res_ext,match2path,
                                   cscut,mfaint,mbright,rad_asec,threshold,psfsize,oversampling,
                                   gxyid,gxy_name1,gxy_name2,nthfactor, rgc_factor, 
                                   seg_path=f"../OUTPUT/{gxyid}/i_seg.fits")
-    # psfpath="../OUTPUT/"+gxyid+'/'+gxy_name1+'_epsf.fits'
-    # fits.writeto(psfpath, epsf1.data.astype(np.float32), overwrite=True)
+    
     psfpath="../OUTPUT/"+gxyid+'/'+gxy_name2+'_epsf.fits'
     fits.writeto(psfpath, epsf2.data.astype(np.float32), overwrite=True)
 
-    '''
-    p0=[0.9,0,1.]
     
-    x1,y1=utils.azimuthal_avg(epsf1.data)
-    popt1,pcov1=curve_fit(utils.gaussian, x1, y1[:,0],p0=p0)
-    print(popt1,popt1[2]*2.355)
     
-    x2,y2=utils.azimuthal_avg(epsf2.data)
-    popt2,pcov2=curve_fit(utils.gaussian, x2, y2[:,0],p0=p0)
-    print(popt2,popt2[2]*2.355)
-
-    plt.scatter(x1,y1[:,0])
-    plt.plot(x1,utils.gaussian(x1,*popt1),color='C1')
-    plt.title(band1+" full")
-    plt.xlabel("Pix")
-    plt.ylabel("Flux")
-    #plt.show(block=False)
-    ##plt.clf()
-    plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfgauss.jpeg',dpi=300)
-    plt.clf()
-
-    plt.scatter(x2,y2[:,0])
-    plt.plot(x2,utils.gaussian(x2,*popt2),color='C1')
-    plt.title(band2+" full")
-    plt.xlabel("Pix")
-    plt.ylabel("Flux")
-    #plt.show(block=False)
-    ##plt.clf()
-    plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_psfgauss.jpeg',dpi=300)
-    plt.clf()
-    '''
-    
-    #RESHAPE THE EPSF DATA TO COMPENSATE FOR OVERSAMPLING
+    #Reshape the Epsf data to compensate the oversampling
     
     shape = np.array(epsf2.shape, dtype=float)
     newshape = oversampling * np.floor(shape / oversampling).astype(np.int32)
@@ -1098,30 +1082,19 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
                                newshape[1] // oversampling, oversampling))
     epsf2_data=np.sum(temp, axis=(1,3))
     utils.visualize(data=epsf2_data, figpath=f'../OUTPUT/plots/{gxyid}/{gxy_name2}_rbpsf.jpeg')
-    #plt.clf()
-    # print(epsf2_data.shape) 
-    # print(epsf2_data.sum())
     
     
-    ###############################################
-    # psfpath="../OUTPUT/"+gxyid+'/'+gxy_name1+'_psf.fits'
-    # fits.writeto(psfpath, epsf1_data.astype(np.float32), overwrite=True)
+    #Write the psf
     psfpath="../OUTPUT/"+gxyid+'/'+gxy_name2+'_psf.fits'
     fits.writeto(psfpath, epsf2_data.astype(np.float32), overwrite=True)
-    ###############################################
+    
     
         
     
-    # epsf_1=fits.open("../OUTPUT/"+gxyid+'/'+gxy_name1+'_psf.fits', do_not_scale_image_data=True)
-    # epsf_2=fits.open("../OUTPUT/"+gxyid+'/'+gxy_name2+'_psf.fits', do_not_scale_image_data=True)
-    # epsf_2=fits.open("../OUTPUT/"+gxyid+'/'+gxy_name2+'_psfstar_6.fits', do_not_scale_image_data=True)
-    # epsf_2=fits.open("../INPUT/IMAGES/"+gxyid+'/'+'psf.big_edit.fits', do_not_scale_image_data=True)
-    
-    # epsf1_data=epsf_1[0].data
-    # epsf2_data=epsf_2[0].data
     r_epsf2=np.zeros(epsf2_data.shape)
     nx,ny=epsf2_data.shape
     x0,y0=nx/2,ny/2
+    
     for i in range(ny):
         for j in range(nx):
             r_epsf2[i,j]=round(np.sqrt((j-x0)**2+(i-y0)**2))
@@ -1130,7 +1103,7 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
         os.makedirs("../OUTPUT/plots/"+gxyid)
 
     
-    ### GAUSSIAN FIT AND FWHM
+    # Gaussian fit and FWHM
     
     p0=[0.9,0,1.]
     
@@ -1156,13 +1129,14 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     plt.yscale('log')
     #plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_rebinnedpsf.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
-    print(popt2,popt2[2]*2.355)
+    print('Gaussian Fit',popt2,popt2[2]*2.355,'\n\n')
     
     print("FWHM: comparing with PSF")
     print(f'g band FWHM:                                from photometry {fwhm1/plate_scale} pix')
-    print(f'i band FWHM: EPSF fit {popt2[2]*2.355} pix, from photometry {fwhm2/plate_scale} pix')
+    print(f'i band FWHM: EPSF fit {popt2[2]*2.355} pix, from photometry {fwhm2/plate_scale} pix \n\n')
 
 
     ##### TESTING THE PSF

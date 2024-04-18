@@ -562,20 +562,23 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     x=np.array(apers[1:-1])[cond]
     print('x', x)
     y=np.log10(d_cog)[cond] #nandini here put log normal
-    print('y', y,)
+    print('y', y, x*2)
     
     #Linear fit
     guess_a=-1.
     guess_b=-4
     popt_asymlin,pcov_asymlin = curve_fit(func_linear,x,y,p0=[guess_a,guess_b])
     
-    plt.plot(x,y)
+    plt.scatter(x,y)
     plt.plot(x, func_linear(x,*popt_asymlin), color='red', label='Fitted Line')
     # plt.plot(x, power_law(x,*popt_asympow), color='red', label='Fitted Line')
     plt.show()
     
     #Asymptote calculation
     asym=cog_sel[-1]+sigmalin(x*2,*popt_asymlin)
+    
+    print('testo',10**(func_linear(x,*popt_asymlin)), )
+    
     print('sigmalin(x*2,*popt_asymlin)',sigmalin(x*2,*popt_asymlin),'\n\n')
     
     aper_corr=asym #np.median(mag6-mag32) #asym 
@@ -592,21 +595,31 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
    
     #Aperture value for the difference <threshold
     
-    thr=0.0075 
+    #threshold
+    thr=0.001
+    
+    #inverse function to find the asymptote aperture
     
     aper_asym=inverse_power(thr,*popt_asympow)
     print('Aperture at asymptote',aper_asym)
-    apertures=np.arange(6, aper_asym,0.01)
-    spacing=np.mean(apertures[1:]-apertures[:-1])
-    print('spacing',spacing)
-    asymptote=np.trapz(np.array(power_law(apertures,*popt_asympow )),apertures)*0.5 #Divided by 2 considering trapezoidal integral method
-    aper_corr= asymptote
+    
+    apers=np.array(apers)
+    spacing=np.mean(apers[1:]-apers[:-1])
+    
+    #arrange generated aperture
+    apertures=np.arange(max(apers), aper_asym,0.001)
+    print(power_law(apertures,*popt_asympow ),apertures)
+    print('spacing',spacing, '\n\n')
+    
+    asymptote=np.trapz(np.array(power_law(apertures,*popt_asympow )),apertures) #Divided by 2 considering trapezoidal integral method
+    aper_corr=cog_sel[-1]+asymptote
     print('Gabriele aperture corr', aper_corr,'\n\n')
     
     #test 
-    apertures=np.linspace(6, aper_asym, 7)
-    asymptote=np.sum(np.array(power_law(apertures,*popt_asympow )))
-    print('test', asymptote,'\n\n')
+    # a=power_law(x*2,*popt_asympow )
+    # aper_corr_gab=cog_sel[-1]+ np.sum(a)
+    # print(a)
+    # print('Gabriele aperture corr', aper_corr_gab,'\n\n')
     
     print('Final aper_corr', aper_corr,'\n\n')
     
@@ -669,7 +682,7 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     plt.scatter(apers[1:],cog_full,color='lightcoral',marker='X',s=400,label='Bright')
     plt.scatter(apers[1:],cog_sel,color='darkgreen',s=150,label='Bright isolated')
     plt.axhline(asym,linestyle='--',color='darkgreen')
-    plt.axhline(asymptote,linestyle='--',color='red')
+    plt.axhline(aper_corr,linestyle='--',color='red')
     trans = transforms.blended_transform_factory(ax1.get_yticklabels()[0].get_transform(), ax1.transData)
     plt.text(0.2,asym-0.05, "{:4.3f}".format(asym), color="darkgreen",ha="right", va="center",transform=trans)
     plt.legend()
@@ -761,6 +774,7 @@ def visualize(data,figpath):
     plt.colorbar()
     
     plt.savefig(figpath,dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig)
     #plt.show(block=False)
@@ -971,25 +985,33 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
     gxydec=gal.gxydec
     r_e=gal.r_e # R_e in arcsec
     
+    
+    #Initialization catalogs
+    
+    #Residual catalog g
     hdul1= astropy.io.fits.open(res1path, ignore_missing_end = True)
     hdul1.info()
     h1=hdul1[res_ext1].header
     data1=hdul1[res_ext1].data
     wcs1=astropy.wcs.WCS(h1)
     
+    #Corrected matched catalog g
     sex1=ascii.read(corrcat1path)
     sex1_cpt=sex1[(sex1['CLASS_STAR']>=csmin) & (sex1['FLAGS']==0)]
     
-    # hdul2= astropy.io.fits.open(res2path, ignore_missing_end = True)
+    
+    #Residual catalog i
     hdul2= astropy.io.fits.open(res2path, do_not_scale_image_data = True)
     hdul2.info()
     h2=hdul2[res_ext2].header
     data2=hdul2[res_ext2].data
     wcs2=astropy.wcs.WCS(h2)
     
+    #Corrected matched cagalog i
     sex2=ascii.read(corrcat2path)
     sex2_cpt=sex2[(sex2['CLASS_STAR']>=csmin) & (sex2['FLAGS']==0)]
     
+    #Definitions of Concentration indexes
     ci1_cpt=(sex1_cpt['MAG_APER']-sex1_cpt['MAG_APER_2'])
     ci1=sex1['MAG_APER']-sex1['MAG_APER_2']
     ci1_high=np.median(ci1_cpt)+mad(ci1_cpt)*1.48*3
@@ -999,17 +1021,18 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
     ci2=sex2['MAG_APER']-sex2['MAG_APER_2']
     ci2_high=np.median(ci2_cpt)+mad(ci2_cpt)*1.48*3
     ci2_low=np.median(ci2_cpt)-mad(ci2_cpt)*1.48*3
-    print(np.median(ci2_cpt),ci2_low, ci2_high)
-    # cpt_cond=((tclean['CLASS_STAR']>csmin) & (ci>=ci_low) & (ci<=ci_high))
-    # apercorr_cond=((tclean['CLASS_STAR']>csmin)& (tclean['FLAGS']==0) & (ci>=ci_low) & (ci<=ci_high) &
-
-
-
+    print('Concentration index i band parameters',np.median(ci2_cpt),ci2_low, ci2_high,'\n\n')
     
+
+    #Galactocentric distances
     rgc1=np.sqrt((sex1['ALPHA_J2000']-gxyra)**2+(sex1['DELTA_J2000']-gxydec)**2)*3600 #Galaxtocentric distance in arcsecs
     rgc2=np.sqrt((sex2['ALPHA_J2000']-gxyra)**2+(sex2['DELTA_J2000']-gxydec)**2)*3600 #Galaxtocentric distance in arcsecs
-    # print(np.min(rgc1))
-    #### ONLY select stars up to 20 Half-light radii
+    
+    
+    
+    #Stars selection conditions definition
+    
+    # ONLY select stars up to rgc_factor Half-light radii
     
     psf_sel=((sex2['MAG_CORR']<mcutfaint)&(sex2['MAG_CORR']>mcutbright) &
              (sex1['CLASS_STAR']>=csmin) & (sex2['CLASS_STAR']>=csmin)&
@@ -1019,92 +1042,86 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
              (sex1['MAG_AUTO']<threshold) & (sex1['MAG_APER']<threshold) & (sex1['MAG_APER_1']<threshold) &
              (sex2['MAG_AUTO']<threshold) & (sex2['MAG_APER']<threshold) & (sex2['MAG_APER_1']<threshold) &
               (rgc1<=rgc_factor*r_e) & (rgc2<=rgc_factor*r_e))
-    # print(np.min(rgc1[psf_sel]))
+
     
 
-    # print("(SOLVED)WARNING: THE PSF SELECTION ALSO NEEDS TO FACTOR IN THE GALACTOCENTRIC DISTANCE (Selected upto 20 half-light radii)")     
+      
 
-    ######### INITIALIZE PSF PARAMETERS
-    #psfsize=64
+    #Parameters initialization
+    
 
+    #qui dice psf size deve essere dispari, perchè?
+    
     if (psfsize%2==0): 
         psfsize+=1
-        print("SIZE OF PSF IN PIX:",psfsize)
+        print("SIZE OF PSF IN PIX:",psfsize,'\n\n')
     epsf_builder = EPSFBuilder(oversampling=oversampling, maxiters=50, progress_bar=True,norm_radius=psfsize,
                                 sigma_clip=SigmaClip(sigma=10000, sigma_lower=10000, sigma_upper=10000, maxiters=1, cenfunc='median', stdfunc='std'))
-    # epsf_builder = EPSFBuilder(oversampling=oversampling, maxiters=50, progress_bar=True,norm_radius=psfsize/2,recentering_boxsize=9,
-    #                             sigma_clip=SigmaClip(sigma=5, maxiters=3, cenfunc='median', stdfunc='std'))
-    # epsf_builder = EPSFBuilder(oversampling=1, maxiters=50, progress_bar=True,norm_radius=psfsize,recentering_boxsize=9,
-    #                             sigma_clip=SigmaClip(sigma=5, maxiters=3, cenfunc='median', stdfunc='std'))
-    # epsf_builder = EPSFBuilder(oversampling=oversampling, maxiters=50, progress_bar=True,norm_radius=psfsize,recentering_boxsize=9,
-    #                             sigma_clip=SigmaClip(sigma=5, maxiters=3, cenfunc='median', stdfunc='std'))
+    
     #### NORM_RADIUS has to be at least sqrt2* radius of PSF
 
-    
-    ################################# BAND 1 
-    sex=sex1
+    # Stars selection 
 
+    # g band
+    
+    sex=sex1
+    
+    #Cleaning and parameters definition
+    
     plt_clean_sex=(sex['MAG_AUTO']<threshold) & (sex['MAG_APER']<threshold) & (sex['MAG_APER_1']<threshold) & (sex['MAG_APER_11']<threshold)
     ra=sex['ALPHA_J2000']
     dec=sex['DELTA_J2000']
     mag4=sex['MAG_APER']
     magau=sex['MAG_AUTO']
-    ci64=sex['MAG_APER_1']-sex['MAG_APER']#concentration index 6-4
+    ci64=sex['MAG_APER_1']-sex['MAG_APER']  #concentration index 6-4
     cs=sex['CLASS_STAR']
         
+    #Plot of initial star selection
+    
     plt.scatter(magau[plt_clean_sex],sex['MAG_APER'][plt_clean_sex]-sex['MAG_APER_2'][plt_clean_sex],color='red',s=0.5)
     plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=1.0)
     plt.axvline(mcutbright,color='yellow')
-    # print("%%%%%%%%%%%%%%%%%%%%%%%")
-    # print(mcutbright,mcutfaint)
     plt.axvline(mcutfaint,color='yellow')
     #plt.xlim([20,27])
     #plt.ylim([-1.15,0.15])
     plt.ylabel('Concentration index 4-8 pix [mag]')
     plt.xlabel('mag_auto [mag]')
-    #plt.show(block=False)
+    plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_first.jpeg',dpi=300)
     plt.clf()
     plt.close()
 
-    # print("magau[sel]")
-    # print(magau[sel])
     
-    # plt.figure(figsize=(10,7))
-    
-    # plt.scatter(ra,dec, s=0.1,color='red',label='All catalog ')
-    # plt.scatter(ra[psf_sel],dec[psf_sel],s=2,marker='s',label='Selected Bright, Compact, Central')
-    # plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    
-    #plt.show(block=False)
-    # plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel.jpeg',dpi=300)
-    # plt.clf()
-    # plt.close()
+    #Application of the selection conditions
     
     sex_brightcpt=sex[psf_sel]
     s=sex.to_pandas()
+    
+    #Objects not selected by the conditions
     others=s.drop(s[psf_sel].index)
     
-   
+    #Sky coordinates of the two catalogs
     coord=SkyCoord(others['ALPHA_J2000'],others['DELTA_J2000'],unit=(u.deg, u.deg))
     coord_brightcpt =SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     
+    # Select non-isolated stars
     
     idxcb, idxcoord, d2d, d3d = coord.search_around_sky(coord_brightcpt, rad_asec*u.arcsec)
     ind=pd.DataFrame(idxcb)
     ind=ind.drop_duplicates()
     
+    #Remove the non-isolated stars from the catalog
     sex_brightcpt.remove_rows(ind[0])
+    
+    #Match the catalog with itself to find a second closest neighbor
     coord2=SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     idx_brightcpt, d2d_brightcpt, d3d_brightcpt = coord2.match_to_catalog_sky(coord2,nthneighbor=2)
     
+    #Further selection on isolated: the closest neighbor must be farther than a specified value
     
-    sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] #further selection on isolated
-    # print("sex_psf")
-    # print(sex_psf)
-    # print("Before and after nthneighbor=2 selection")
-    # print(len(sex_brightcpt),len(sex_psf))
-    # print(sex_psf)
+    sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] 
+    
+    #Catalog handling
     savepath=f'../OUTPUT/{gxyid}/{gxy_name1}_psf.cat'
     sex_psf.write(savepath,format='ascii',overwrite=True)
     sex_psf=sex_psf.to_pandas()
@@ -1113,18 +1130,18 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
     ra_psf=sex_psf['ALPHA_J2000']
     dec_psf=sex_psf['DELTA_J2000']
     
+    #Plot the positions of the stars 
     plt.figure(figsize=(10,7))
     
     plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
     plt.scatter(ra_psf,dec_psf,s=2,marker='s',label='Selected isolated sources')
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_isolated.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
 
-
-    #plt.show(block=False)
-    #plt.clf()
+    #Creation of the NDDdata to extract the cutout of the stars with photutils extract_stars
     
     nddata = NDData(data=data1,wcs=wcs1)  
     position=SkyCoord(ra_psf,dec_psf,unit='deg')
@@ -1132,15 +1149,18 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
     stars_tbl = Table()
     stars_tbl['skycoord']=position
     # stars_tbl=stars_tbl[:8]
-    print('Number of selected stars:',len(stars_tbl))
+    print('Number of selected stars:',len(stars_tbl),'\n\n')
    
+    #Stars cut-out
+    
     stars = extract_stars(nddata, stars_tbl, size=psfsize)
     
     print(stars[0].shape)
     
     # for i in range(len(stars)):    
     #     visualize(stars[i])
-     
+    
+    #Plot of the selected stars
     nrows = int(np.ceil(np.sqrt(len(stars))))
     ncols = int(np.ceil(np.sqrt(len(stars))))
     plt.figure(figsize=(nrows,ncols))
@@ -1151,43 +1171,39 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
         norm = simple_norm(stars[i], 'log', percent=99.)
         ax[i].imshow(stars[i], norm=norm, origin='lower', cmap='viridis')
 
-    #plt.show(block=False)
-    #plt.clf()
+    plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfstars.jpeg',dpi=300)
     plt.clf()
     plt.close(fig)
 
-   
-    #sex_psf.remove_row(-4)
     
     
     stars = extract_stars(nddata, stars_tbl, size=psfsize)
     
-    ##########################################
-    # BUILDING THE LOCAL PSF
     
-    # epsf_model= EPSFModel(stars[0],oversampling=4)    
+    # Building of the PSF: g band
+       
     epsf1, fitted_stars1 = epsf_builder.build_epsf(stars) 
-    # epsf1.data=epsf1.data.reshape((psfsize,psfsize))
+    
 
     visualize(data=epsf1.data,figpath=f'../OUTPUT/plots/{gxyid}/{gxy_name1}_epsf.jpeg')
-    print(epsf1.data.shape) 
-    print(epsf1.data.sum())
+    print('Epsf g band data shape',epsf1.data.shape) 
+    print('Epsf g band data sum',epsf1.data.sum(),'\n\n')
     
-    #res=epsf.data
+    
     
    
-    ################################################### BAND 2
+    # i band
+    
     sex=sex2
+    
     plt_clean_sex=(sex['MAG_AUTO']<threshold) & (sex['MAG_APER']<threshold) & (sex['MAG_APER_1']<threshold) & (sex['MAG_APER_11']<threshold)
-    #iniziamo dando i nomi alle colonne
+    
     ra=sex['ALPHA_J2000']
     dec=sex['DELTA_J2000']
-    # mag4=sex['MAG_APER']
     magau=sex['MAG_AUTO']
-    # ci64=sex['MAG_APER_1']-sex['MAG_APER']#concentration index 6-4
-    # cs=sex['CLASS_STAR']
     
+    #Plot firs selection stars
     plt.scatter(magau[plt_clean_sex],sex['MAG_APER'][plt_clean_sex]-sex['MAG_APER_2'][plt_clean_sex],color='red',s=0.5)
     plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=1)
     # plt.axvline(mcutbright,color='yellow')
@@ -1198,44 +1214,53 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
     plt.ylabel('Concentration index 4-8 pix [mag]')
     plt.xlabel('mag_auto [mag]')
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_psfsel_first.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
     
+    #Application of the selection conditions
     sex_brightcpt=sex[psf_sel]
     s=sex.to_pandas()
+    
+    #discrad the non-selected objects
     others=s.drop(s[psf_sel].index)
     
-    # print("others")
-    # print(others)
-    
+    #Sky coordinates of the two catalogs
     coord=SkyCoord(others['ALPHA_J2000'],others['DELTA_J2000'],unit=(u.deg, u.deg))
     coord_brightcpt =SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     
-    
+    #Selection of non-isolated stars
     idxcb, idxcoord, d2d, d3d = coord.search_around_sky(coord_brightcpt, rad_asec*u.arcsec)
-    print("len(d2d),d2d,idxcb")
-    print(len(d2d),d2d,idxcb)
+    print("Number of selected non-isolated stars", len(d2d), '\n\n')
+    
     ind=pd.DataFrame(idxcb)
     ind=ind.drop_duplicates()
-    print("len(ind)")
-    print(len(ind))
     
+    
+    #First removal of the non-isolated stars
     sex_brightcpt.remove_rows(ind[0])
+    
+    #Matching the catalog with itself to find the closest neighbor
     coord2=SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     idx_brightcpt, d2d_brightcpt, d3d_brightcpt = coord2.match_to_catalog_sky(coord2,nthneighbor=2)
     
-    
+    #Further selection on isolated: the closest neighbor must be farther than a specified value
+
     sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] #further selection on isolated
+    
+    #Catalogs handling
     savepath=f'../OUTPUT/{gxyid}/{gxy_name2}_psf.cat'
     sex_psf.write(savepath,format='ascii',overwrite=True)
     sex_psf=sex_psf.to_pandas()
     sex_psf=sex_psf.sort_values('MAG_CORR')
 
-    print("Before and after nthneighbor=2 selection")
-    print(len(sex_brightcpt),len(sex_psf))
-    ra_psf=sex_psf['ALPHA_J2000']
-    dec_psf=sex_psf['DELTA_J2000']
+    print("Number of selected nthneighbor=2 stars", len(sex_brightcpt)-len(sex_psf),'\n\n')
     
+    
+    
+    
+    
+   #Plot of the positions of the stars 
     plt.figure(figsize=(10,7))
     
     plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
@@ -1247,20 +1272,26 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
 
     #plt.show(block=False)
     
-    #*******************************************
+    #Creation of the NDDdata to extract the cutout of the stars with photutils extract_stars
+    ra_psf=sex_psf['ALPHA_J2000']
+    dec_psf=sex_psf['DELTA_J2000']
+    
     nddata = NDData(data=data2,wcs=wcs2)  
     position=SkyCoord(ra_psf,dec_psf,unit='deg')
     
     stars_tbl = Table()
     stars_tbl['skycoord']=position
     # stars_tbl=stars_tbl[:8]
-    print('Number of selected stars:',len(stars_tbl))
+    print('Number of selected stars:',len(stars_tbl),'\n\n')
     
+    #Cut-out
     stars = extract_stars(nddata, stars_tbl, size=psfsize)
     
     # for i in range(len(stars)):    
     #     visualize(stars[i])
      
+    #Plot of the cut-out stars
+    
     nrows = int(np.ceil(np.sqrt(len(stars))))
     ncols = int(np.ceil(np.sqrt(len(stars))))
     plt.figure(figsize=(nrows,ncols))
@@ -1274,17 +1305,17 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
 
 
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_psfstars.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig)
     
     
-    print(len(stars))
-    
-    ##########################################
-    # BUILDING THE LOCAL PSF
+    print('Number of selected stars',len(stars),'\n\n')
     
     
-    # epsf_builder = EPSFBuilder(oversampling=1, maxiters=50,progress_bar=False,norm_radius=30)  
+    # Building of the PSF
+    
+    
     epsf2, fitted_stars2 = epsf_builder.build_epsf(stars) 
     
     visualize(data=epsf2.data,figpath=f'../OUTPUT/plots/{gxyid}/{gxy_name2}_epsf.jpeg')
@@ -1294,7 +1325,7 @@ def twoband_psf(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
         
 
     # print('NEED TO COMPARE PHOTOMETRY OF PSF WITH DAOPHOT')
-    ###########################################
+
     return epsf1,epsf2
 
 
@@ -1307,25 +1338,33 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     gxydec=gal.gxydec
     r_e=gal.r_e # R_e in arcsec
     
+    #Residual in g
     hdul1= fits.open(res1path, do_not_scale_image_data = True)
     hdul1.info()
     h1=hdul1[res_ext1].header
     data1=hdul1[res_ext1].data
     wcs1=astropy.wcs.WCS(h1)
     
+    #Corrected matched cat g
     sex1=Table.read(corrcat1path, format='ascii.commented_header')
+    #Compact
     sex1_cpt=sex1[(sex1['CLASS_STAR']>=csmin) & (sex1['FLAGS']==0)]
     
-    # hdul2= astropy.io.fits.open(res2path, ignore_missing_end = True)
+    #Residuals in i
+    
     hdul2= astropy.io.fits.open(res2path, do_not_scale_image_data = True)
     hdul2.info()
     h2=hdul2[res_ext2].header
     data2=hdul2[res_ext2].data
     wcs2=astropy.wcs.WCS(h2)
     
+    #Corrected matche cat i
+    
     sex2=Table.read(corrcat2path, format='ascii.commented_header')
+    #Compact
     sex2_cpt=sex2[(sex2['CLASS_STAR']>=csmin) & (sex2['FLAGS']==0)]
     
+    #Selection stars for psf 1
     ci1_cpt=(sex1_cpt['MAG_APER']-sex1_cpt['MAG_APER_2'])
     ci1=sex1['MAG_APER']-sex1['MAG_APER_2']
     ci1_high=np.median(ci1_cpt)+mad(ci1_cpt)*1.48*3
@@ -1343,8 +1382,8 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     
     rgc1=np.sqrt((sex1['ALPHA_J2000']-gxyra)**2+(sex1['DELTA_J2000']-gxydec)**2)*3600 #Galaxtocentric distance in arcsecs
     rgc2=np.sqrt((sex2['ALPHA_J2000']-gxyra)**2+(sex2['DELTA_J2000']-gxydec)**2)*3600 #Galaxtocentric distance in arcsecs
-    # print(np.min(rgc1))
-    #### ONLY select stars up to 20 Half-light radii
+    
+    # PSF selection 2 (ONLY select stars up to rgc_factor Half-light radii)
     
     psf_sel=((sex2['MAG_CORR']<mcutfaint)&(sex2['MAG_CORR']>mcutbright) &
              (sex1['CLASS_STAR']>=csmin) & (sex2['CLASS_STAR']>=csmin)&
@@ -1357,82 +1396,82 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     # print(np.min(rgc1[psf_sel]))
     
 
-    # print("(SOLVED)WARNING: THE PSF SELECTION ALSO NEEDS TO FACTOR IN THE GALACTOCENTRIC DISTANCE (Selected upto 20 half-light radii)")     
 
-    ######### INITIALIZE PSF PARAMETERS
-    #psfsize=64
+    #parameters initialization
+    
 
+    #qui dice psf size deve essere dispari, perchè?
+    
     if (psfsize%2==0): 
         psfsize+=1
-        print("SIZE OF PSF IN PIX:",psfsize)
+        print("SIZE OF PSF IN PIX:",psfsize,'\n\n')
     epsf_builder = EPSFBuilder(oversampling=oversampling, maxiters=50, progress_bar=True,norm_radius=psfsize,
                                 sigma_clip=SigmaClip(sigma=10000, sigma_lower=10000, sigma_upper=10000, maxiters=1, cenfunc='median', stdfunc='std'))
-
     
-    ################################# BAND 1 
-    sex=sex1
+    #### NORM_RADIUS has to be at least sqrt2* radius of PSF
 
+    # Stars selection 
+
+    # g band
+    
+    sex=sex1
+    
+    #Cleaning and parameters definition
+    
     plt_clean_sex=(sex['MAG_AUTO']<threshold) & (sex['MAG_APER']<threshold) & (sex['MAG_APER_1']<threshold) & (sex['MAG_APER_11']<threshold)
     ra=sex['ALPHA_J2000']
     dec=sex['DELTA_J2000']
     mag4=sex['MAG_APER']
     magau=sex['MAG_AUTO']
-    ci64=sex['MAG_APER_1']-sex['MAG_APER']#concentration index 6-4
+    ci64=sex['MAG_APER_1']-sex['MAG_APER']  #concentration index 6-4
     cs=sex['CLASS_STAR']
         
+    #Plot of initial star selection
+    
     plt.scatter(magau[plt_clean_sex],sex['MAG_APER'][plt_clean_sex]-sex['MAG_APER_2'][plt_clean_sex],color='red',s=0.5)
     plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=1.0)
     plt.axvline(mcutbright,color='yellow')
-    # print("%%%%%%%%%%%%%%%%%%%%%%%")
-    # print(mcutbright,mcutfaint)
     plt.axvline(mcutfaint,color='yellow')
     #plt.xlim([20,27])
     #plt.ylim([-1.15,0.15])
     plt.ylabel('Concentration index 4-8 pix [mag]')
     plt.xlabel('mag_auto [mag]')
-    #plt.show(block=False)
+    plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_first.jpeg',dpi=300)
     plt.clf()
     plt.close()
 
-    # print("magau[sel]")
-    # print(magau[sel])
     
-    # plt.figure(figsize=(10,7))
-    
-    # plt.scatter(ra,dec, s=0.1,color='red',label='All catalog ')
-    # plt.scatter(ra[psf_sel],dec[psf_sel],s=2,marker='s',label='Selected Bright, Compact, Central')
-    # plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    
-    #plt.show(block=False)
-    # plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel.jpeg',dpi=300)
-    # plt.clf()
-    # plt.close()
+    #Application of the selection conditions
     
     sex_brightcpt=sex[psf_sel]
     s=sex.to_pandas()
+    
+    #Objects not selected by the conditions
     others=s.drop(s[psf_sel].index)
     
-   
+    #Sky coordinates of the two catalogs
     coord=SkyCoord(others['ALPHA_J2000'],others['DELTA_J2000'],unit=(u.deg, u.deg))
     coord_brightcpt =SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     
+    # Select non-isolated stars
     
     idxcb, idxcoord, d2d, d3d = coord.search_around_sky(coord_brightcpt, rad_asec*u.arcsec)
     ind=pd.DataFrame(idxcb)
     ind=ind.drop_duplicates()
     
+    #Remove the non-isolated stars from the catalog
     sex_brightcpt.remove_rows(ind[0])
+    
+    #Match the catalog with itself to find a second closest neighbor
     coord2=SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     idx_brightcpt, d2d_brightcpt, d3d_brightcpt = coord2.match_to_catalog_sky(coord2,nthneighbor=2)
     
+    #Further selection on isolated: the closest neighbor must be farther than a specified value
     
-    sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] #further selection on isolated
-    # print("sex_psf")
-    # print(sex_psf)
-    # print("Before and after nthneighbor=2 selection")
-    # print(len(sex_brightcpt),len(sex_psf))
-    # print(sex_psf)
+    sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] 
+    
+    #Catalog handling
     savepath=f'../OUTPUT/{gxyid}/{gxy_name1}_psf.cat'
     sex_psf.write(savepath,format='ascii',overwrite=True)
     sex_psf=sex_psf.to_pandas()
@@ -1441,18 +1480,18 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     ra_psf=sex_psf['ALPHA_J2000']
     dec_psf=sex_psf['DELTA_J2000']
     
+    #Plot the positions of the stars 
     plt.figure(figsize=(10,7))
     
     plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
     plt.scatter(ra_psf,dec_psf,s=2,marker='s',label='Selected isolated sources')
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_isolated.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
 
-
-    #plt.show(block=False)
-    #plt.clf()
+    #Creation of the NDDdata to extract the cutout of the stars with photutils extract_stars
     
     nddata = NDData(data=data1,wcs=wcs1)  
     position=SkyCoord(ra_psf,dec_psf,unit='deg')
@@ -1460,15 +1499,18 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     stars_tbl = Table()
     stars_tbl['skycoord']=position
     # stars_tbl=stars_tbl[:8]
-    print('Number of selected stars:',len(stars_tbl))
-    # print(stars_tbl)
+    print('Number of selected stars:',len(stars_tbl),'\n\n')
+   
+    #Stars cut-out
+    
     stars = extract_stars(nddata, stars_tbl, size=psfsize)
     
     print(stars[0].shape)
     
     # for i in range(len(stars)):    
     #     visualize(stars[i])
-     
+    
+    #Plot of the selected stars
     nrows = int(np.ceil(np.sqrt(len(stars))))
     ncols = int(np.ceil(np.sqrt(len(stars))))
     plt.figure(figsize=(nrows,ncols))
@@ -1479,75 +1521,84 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
         norm = simple_norm(stars[i], 'log', percent=99.)
         ax[i].imshow(stars[i], norm=norm, origin='lower', cmap='viridis')
 
-    #plt.show(block=False)
-    #plt.clf()
+    plt.show(block=False)
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfstars.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig)
+
 
    
     
    
-    ################################################### BAND 2
+    # i band
+    
     sex=sex2
+    
     plt_clean_sex=(sex['MAG_AUTO']<threshold) & (sex['MAG_APER']<threshold) & (sex['MAG_APER_1']<threshold) & (sex['MAG_APER_11']<threshold)
-    #iniziamo dando i nomi alle colonne
+    
     ra=sex['ALPHA_J2000']
     dec=sex['DELTA_J2000']
-    # mag4=sex['MAG_APER']
     magau=sex['MAG_AUTO']
-    # ci64=sex['MAG_APER_1']-sex['MAG_APER']#concentration index 6-4
-    # cs=sex['CLASS_STAR']
     
+    #Plot firs selection stars
     plt.scatter(magau[plt_clean_sex],sex['MAG_APER'][plt_clean_sex]-sex['MAG_APER_2'][plt_clean_sex],color='red',s=0.5)
     plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=1)
-    plt.axvline(mcutbright,color='yellow')
-    plt.axvline(mcutfaint,color='yellow')
+    # plt.axvline(mcutbright,color='yellow')
+    # plt.axvline(mcutfaint,color='yellow')
     
     #plt.xlim([20,27])
     #plt.ylim([-1.15,0.15])
     plt.ylabel('Concentration index 4-8 pix [mag]')
     plt.xlabel('mag_auto [mag]')
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_psfsel_first.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close()
     
+    #Application of the selection conditions
     sex_brightcpt=sex[psf_sel]
     s=sex.to_pandas()
+    
+    #discrad the non-selected objects
     others=s.drop(s[psf_sel].index)
     
-    # print("others")
-    # print(others)
-    
+    #Sky coordinates of the two catalogs
     coord=SkyCoord(others['ALPHA_J2000'],others['DELTA_J2000'],unit=(u.deg, u.deg))
     coord_brightcpt =SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     
-    
+    #Selection of non-isolated stars
     idxcb, idxcoord, d2d, d3d = coord.search_around_sky(coord_brightcpt, rad_asec*u.arcsec)
-    print("len(d2d),d2d,idxcb")
-    print(len(d2d),d2d,idxcb)
+    print("Number of selected non-isolated stars", len(d2d), '\n\n')
+    
     ind=pd.DataFrame(idxcb)
     ind=ind.drop_duplicates()
-    print("len(ind)")
-    print(len(ind))
     
+    
+    #First removal of the non-isolated stars
     sex_brightcpt.remove_rows(ind[0])
+    
+    #Matching the catalog with itself to find the closest neighbor
     coord2=SkyCoord(sex_brightcpt['ALPHA_J2000'],sex_brightcpt['DELTA_J2000'],unit=(u.deg, u.deg))
     idx_brightcpt, d2d_brightcpt, d3d_brightcpt = coord2.match_to_catalog_sky(coord2,nthneighbor=2)
     
-    
+    #Further selection on isolated: the closest neighbor must be farther than a specified value
+
     sex_psf=sex_brightcpt[(d2d_brightcpt.arcsec>rad_asec*nthfactor)] #further selection on isolated
+    
+    #Catalogs handling
     savepath=f'../OUTPUT/{gxyid}/{gxy_name2}_psf.cat'
     sex_psf.write(savepath,format='ascii',overwrite=True)
     sex_psf=sex_psf.to_pandas()
     sex_psf=sex_psf.sort_values('MAG_CORR')
 
-    print("Before and after nthneighbor=2 selection")
-    print(len(sex_brightcpt),len(sex_psf))
-    ra_psf=sex_psf['ALPHA_J2000']
-    dec_psf=sex_psf['DELTA_J2000']
-    id_psf=sex_psf['NUMBER']
+    print("Number of selected nthneighbor=2 stars", len(sex_brightcpt)-len(sex_psf),'\n\n')
     
+    
+    
+    
+    
+   #Plot of the positions of the stars 
     plt.figure(figsize=(10,7))
     
     plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
@@ -1559,17 +1610,23 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
 
     #plt.show(block=False)
     
-    #*******************************************
+    #Creation of the NDDdata to extract the cutout of the stars with photutils extract_stars
+    ra_psf=sex_psf['ALPHA_J2000']
+    dec_psf=sex_psf['DELTA_J2000']
+    
     nddata = NDData(data=data2,wcs=wcs2)  
     position=SkyCoord(ra_psf,dec_psf,unit='deg')
     
     stars_tbl = Table()
     stars_tbl['skycoord']=position
     # stars_tbl=stars_tbl[:8]
-    print('Number of selected stars:',len(stars_tbl))
+    print('Number of selected stars:',len(stars_tbl),'\n\n')
     
-    # print(stars_tbl)
+    #Cut-out
     stars = extract_stars(nddata, stars_tbl, size=psfsize)
+    
+    # for i in range(len(stars)):    
+    #     visualize(stars[i])
     
     if seg_path is not None:
         hdum2= astropy.io.fits.open(seg_path, do_not_scale_image_data = True)
@@ -1580,7 +1637,9 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
         segmask=np.ones(mask2.shape)
         # segmask[mask2 not in id_psf]=0
         data2=data2*segmask
-     
+    
+    #Plot of the cut-outs
+    
     nrows = int(np.ceil(np.sqrt(len(stars))))
     ncols = int(np.ceil(np.sqrt(len(stars))))
     plt.figure(figsize=(nrows,ncols))
@@ -1596,28 +1655,31 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
 
 
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_psfstars.jpeg',dpi=300)
+    plt.show()
     plt.clf()
     plt.close(fig)
     
     
     print(len(stars))
     
-    ##########################################
-    # BUILDING THE LOCAL PSF
+    print('Number of selected stars',len(stars),'\n\n')
     
     
+    # Building of the PSF
+    
+
     # epsf_builder = EPSFBuilder(oversampling=1, maxiters=50,progress_bar=False,norm_radius=30)  
     if (run_epsfbuild):
         epsf2, fitted_stars2 = epsf_builder.build_epsf(stars) 
         
         visualize(data=epsf2.data,figpath=f'../OUTPUT/plots/{gxyid}/{gxy_name2}_epsf.jpeg')
-        print(epsf2.data.shape) 
-        print(epsf2.data.sum())
+        print('Epsf g band data shape',epsf2.data.shape) 
+        print('Epsf g band data sum',epsf2.data.sum(),'\n\n')
         
             
 
         # print('NEED TO COMPARE PHOTOMETRY OF PSF WITH DAOPHOT')
-        ###########################################
+        
         return epsf2
 
 def choose_stars(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
