@@ -87,7 +87,7 @@ def run_part1(rms=0, remove_bkg=False) :
     maxsma0=gal.maxsma0
     sma0=gal.sma0        #First annulus for ellipse fitting
     eps0=gal.eps0        #Ellipticity
-    pa0=gal.eps0         #Position angle
+    pa0=gal.pa0         #Position angle
     agxy=gal.agxy        #Step for increasing SMA
     maxrad=gal.maxrad    #Max radius for the fitting
     minrad=gal.minrad    #Min radius for the fitting
@@ -164,6 +164,8 @@ def run_part1(rms=0, remove_bkg=False) :
     xgxy, ygxy = wgxy.wcs_world2pix(gxyra, gxydec, 1) # Get the galaxy center in pixels
     x0=int(xgxy)
     y0=int(ygxy)
+    print(gxyra, gxydec)
+    print('x0,y0',x0,y0)
     
     
     #Read instrument mask if needed (read_hsc_mask=1)
@@ -204,7 +206,7 @@ def run_part1(rms=0, remove_bkg=False) :
     else:
         print('Weight data converted linearly','\n\n' )
         weight_data=sex_mask/weight_data
-   
+    
     fits.writeto(f"../OUTPUT/{gxyid}/weights.fits", weight_data, overwrite=True)
     hduw.close()
     
@@ -396,7 +398,6 @@ def run_part1(rms=0, remove_bkg=False) :
     # Save background subtracted image data
     
     fits.writeto(galimg, image_data, header=hdu[img_ext].header, overwrite=True)
-    
 
 
     
@@ -408,7 +409,7 @@ def run_part1(rms=0, remove_bkg=False) :
                     linear_growth=False, fix_center=False, fix_pa=False, fix_eps=False)
     tend_g=time.time()
     print('Initial Geometry model', "Fit time in seconds : %6.3f" %(tend_g-tini_g),'\n\n' )
-    
+
     #Ellipse modeling
     tini_e=time.time()
     ellipse = Ellipse(masked_data, geometry=geo0,threshold=0.1)
@@ -442,7 +443,7 @@ def run_part1(rms=0, remove_bkg=False) :
     #Draw an ellipse with initial guesses
     aper = EllipticalAperture((xgxy, ygxy), smagxy, smagxy*(1 - epsgxy), pagxy)
     
-    
+    print(aper)
     
     
     # Galaxy final Modeling, starting from the initial values calculated before
@@ -563,7 +564,7 @@ def run_part1(rms=0, remove_bkg=False) :
     #Close the HDU
     hdu.close()
     # os.remove(sewpytempimg)
-    os.remove(f"../OUTPUT/{gxyid}/weights.fits")
+    # os.remove(f"../OUTPUT/{gxyid}/weights.fits")
     os.remove(f"../OUTPUT/mback.fits")
     #os.remove(f"../OUTPUT/extapfile.fits")
     os.remove(f"../OUTPUT/cptapfile.fits")
@@ -1139,7 +1140,7 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     print(f'i band FWHM: EPSF fit {popt2[2]*2.355} pix, from photometry {fwhm2/plate_scale} pix \n\n')
 
 
-    ##### TESTING THE PSF
+    # Testing PSF
     
     ################################################
     '''
@@ -1240,42 +1241,46 @@ def run_pr_cat(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, cutout_size,
     
     #Read the catalogs in the 2 bands of interest
     gxy_name1=gxyid+'_'+band1
-    # cat1path="../OUTPUT/"+gxyid+'/'+band1+'_matchedcorr.cat' #Matched corrected catalog
-    resimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_res.fits' #residual image file path
-    # modimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mod.fits' #model image file path
-    # galimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'.fits' #galaxy image
-    # maskimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mask.fits' #mask image  
+    # cat1path="../OUTPUT/"+gxyid+'/'+band1+'_matchedcorr.cat'  #Matched corrected catalog
+    resimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_res.fits'        #residual image file path
+    # modimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mod.fits'      #model image file path
+    # galimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'.fits'          #galaxy image
+    # maskimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_mask.fits'    #mask image  
     whtimg1="../OUTPUT/"+gxyid+"/"+gxy_name1+'_revwht.fits'
     # t1 = Table.read(cat1path, format='ascii.commented_header')
 
     gxy_name2=gxyid+'_'+band2
     cat2path="../OUTPUT/"+gxyid+'/'+band2+'_matchedcorr.cat'
-    resimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_res.fits' #residual image file path
-    # modimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mod.fits' #residual image file path
-    # galimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'.fits' #galaxy image
-    # maskimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mask.fits' #mask image
+    resimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_res.fits'    #residual image file path
+    # modimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mod.fits'  #model image file path
+    # galimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'.fits'      #galaxy image
+    # maskimg2="../OUTPUT/"+gxyid+'/'+gxy_name2+'_mask.fits'#mask image
     whtimg2="../OUTPUT/"+gxyid+"/"+gxy_name2+'_revwht.fits'
     t2 = Table.read(cat2path, format='ascii.commented_header')
-
-    # img1=fits.open(galimg1, do_not_scale_image_data=True)
+    
+    #Residuals handling
+    
+    #img1=fits.open(galimg1, do_not_scale_image_data=True)
     res1=fits.open(resimg1, do_not_scale_image_data=True)
     resdata1=res1[res_ext].data
     reshdr1=res1[res_ext].header
     wcs1=WCS(reshdr1)
 
-    # img2=fits.open(galimg2, do_not_scale_image_data=True)
+    #img2=fits.open(galimg2, do_not_scale_image_data=True)
     res2=fits.open(resimg2, do_not_scale_image_data=True)
     # res2.info()
     resdata2=res2[res_ext].data
     reshdr2=res2[res_ext].header
     wcs2=WCS(reshdr2)
+    
+    #Weight handling
     wht2=fits.open(whtimg2, do_not_scale_image_data=True)
     # wht2.info()
     whtdata2=wht2[wht_ext].data
 
     rmin=rfact*gal.minrad #mask inner region of galaxy
 
-      #UNCOMMENT IF YOU WANT TO INCLUDE INST MASK IN FINAL MASK
+      #If you want to include the instrument mask
     if (gal.read_hsc_mask):
         instrmaskimg1="../OUTPUT/"+gxyid+'/'+gxy_name1+'_instrmask.fits' #instrument mask image
         mask1=fits.open(instrmaskimg1, do_not_scale_image_data=True)
@@ -1287,40 +1292,55 @@ def run_pr_cat(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, cutout_size,
         maskdata1=np.zeros(resdata1.shape)
         maskdata2=np.zeros(resdata2.shape)
     
+    #Masking the central part
     gxycenpix = regions.PixCoord.from_sky(gxycen, wcs2)#mwcs2.wcs_world2pix(gxyra, gxydec, 1) # Get the galaxy center in pixels
     maskin=CirclePixelRegion(gxycenpix, rmin)
     maskin=(maskin.to_mask(mode='center')).to_image(resdata2.shape)
-    print(gxycenpix)
+    print('Galaxy center:',gxycenpix)
+    
+    #Application of instrumental mask
     maskdata2=np.logical_or(maskdata2,maskin).astype(np.int32)
     # fits.writeto("../OUTPUT/"+gxyid+'/'+gxy_name2+'_testmask.fits',maskdata2, overwrite=True)
     
-
+    #Background-subtracted residual 
     res_mbkg_i=fits.open("../OUTPUT/"+gxyid+"/"+gxy_name2+"_mbkg.fits")
     mbkgdata2=res_mbkg_i[res_ext].data
 
-    # MAKING AND WRITING CUTOUTS
+    
+    
+    #Mask application to background subtracted residual
     masked_data_i=mbkgdata2*(1-maskdata2)
+    
+    #cutout of the background-subtracted residual
     cutout_masked=Cutout2D(masked_data_i,gxycen,cutout_size,wcs=wcs2)
     res2[res_ext].header.update(cutout_masked.wcs.to_header())
     cutout_hdr=res2[res_ext].header
+    
+    #cutout of the weight image
     wht_cutout=Cutout2D(whtdata2,gxycen,cutout_size,wcs=wcs2)
     wht2[wht_ext].header.update(wht_cutout.wcs.to_header())
     wcutout_hdr=wht2[wht_ext].header
+    
+    #cutout of the mask
     mask_cutout=Cutout2D(1-maskdata2,gxycen,cutout_size,wcs=wcs2)
     # print(cutout_hdr)
 
+    #Galaxy center in pixel for the bkg subtracted image
     xgxy, ygxy = WCS(cutout_hdr).wcs_world2pix(gxyra, gxydec, 1) # Get the galaxy center in pixels
     x0=int(xgxy)
     y0=int(ygxy)
 
-    # INSTRUMENT/BASIC MASK FOR P_r module
+    # Writing the catalogs
+    
+    #Instrument/basic mask
     fits.writeto("../OUTPUT/"+gxyid+'/'+gxy_name2+'_p_r_mask_cutout.fits',mask_cutout.data.astype(np.float32), header=cutout_hdr, overwrite=True)
-    # MASKED MBKG RESIDUALS
+    
+    # Masked bkg-subtracted residuals
     fits.writeto("../OUTPUT/"+gxyid+"/"+gxy_name2+"_cutout.fits",cutout_masked.data.astype(np.float32), header=cutout_hdr, overwrite=True)
     wht_cutout_path="../OUTPUT/"+gxyid+"/"+gxy_name2+"_whtcutout.fits"
     fits.writeto(wht_cutout_path,wht_cutout.data.astype(np.float32), header=wcutout_hdr, overwrite=True)
 
-    #### Sextractor run for mask objects: only i band, ONLY ON CUTOUT
+    # Sextractor run on the bkg-subtracted cutout (needed for the P_r module)
 
     sewpyconf={"PARAMETERS_NAME":"../INPUT/UTILS/p_r.param.lsst",
                           "FILTER_NAME":"../INPUT/UTILS/gauss_3.0_5x5.conv",
@@ -2210,6 +2230,7 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     # mask_i=1-mask_stompout[0].data  # FOR MIK'S MASK
     mask_stompout=fits.open("../OUTPUT/"+gxyid+"/"+gxy_name2+"_stompout.fits")
     mask_i=mask_stompout[0].data  # FOR NH'S MASK
+    print('mask_i',mask_i)
     mwcs2=WCS(mask_stompout[0].header)
 
     mask_scale=4.
@@ -2221,7 +2242,8 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     mask_reg=[np.empty(resdata2.shape)]
     # radii=[rad2]
 
-
+    #Creating the annuli regions
+    
     gxycenpix = regions.PixCoord.from_sky(gxycen, mwcs2)#mwcs2.wcs_world2pix(gxyra, gxydec, 1) # Get the galaxy center in pixels
     annreg_in=CirclePixelRegion(gxycenpix, in_rad)
     annreg_in=(annreg_in.to_mask(mode='center')).to_image(mask_i.shape)
@@ -2235,10 +2257,14 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     mbkgdata2=res_mbkg_i[res_ext].data
     
     # mask_reg_i=mask_reg[0]
+    
+    #Masking the regions: creating the masked image
+    
     mask_final=np.logical_or(mask_i,1-annreg).astype(np.int32)
     masked_data_i=mbkgdata2*(1-mask_final)
     fits.writeto(f"../OUTPUT/{gxyid}/i_masked_stompout_ann{ann}.fits",masked_data_i.astype(np.float32), header=res_mbkg_i[res_ext].header, overwrite=True)
     masked_data_i=np.ma.masked_equal(masked_data_i,0)
+    print('mask_final',mask_final)
     mask_i=1-mask_final # THIS IS THE MASK VARIABLE BEING USED
     print(f"N_PIX={np.sum(mask_i)}")
     # npix=np.sum(mask_i)
@@ -2254,8 +2280,8 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # masked_data=image_data*(1-mask_data)
         # masked_data=np.ma.masked_equal(masked_data,0)
 
-    
-    
+    #Power spectrum of the residual (masked) 
+
     masked_data2=masked_data_i#resdata2*(1-maskdata2)
     # masked_data2=np.ma.masked_equal(masked_data2,0)    
     # cutout2= Cutout2D(masked_data2,(1800,1430),500,wcs=wcs2)    #masked_data2 #  
@@ -2280,6 +2306,9 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     
     print("AZIM AVG POWER SPECTRUM")
     # kmed1,flux1=utils.azimuthal_avg(ps1)
+    
+    #Azimuthal average power spectrum of the masked image
+    
     kmed2,flux2=utils.azimuthal_avg(ps2)
     
     # np.savez(f"../OUTPUT/{gxyid}/{gxy_name1}_maskedazim.npz",kmed1=kmed1,flux1=flux1)
@@ -2288,8 +2317,12 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     
 
 
-    ### MULTIPLY MASK WITH MODEL, GENERATE POWSPEC OF SQRT OF THIS PRODUCT
+    # MULTIPLY MASK WITH MODEL, GENERATE POWSPEC OF SQRT OF THIS PRODUCT
+    
+    #Power spectrum of the mask
+
     mask_cutout=mask_i#Cutout2D(mask_i, gxycen, cutout2.shape, wcs=wcs2)
+    print('mask_cutout',mask_cutout)
     mod_cutout=Cutout2D(moddata2, gxycen, cutout2.shape, wcs=wcs2)
     mod_ann=mod_cutout.data*mask_cutout.data
     # print(np.sum(mask_cutout.data))
@@ -2298,11 +2331,14 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     # print(f"<g> in annulus={np.median(mod_ann[mod_ann!=0])}")
     # mod_ann=mod_cutout.data*mask_cutout.data
     # print(f"<g> in annulus={np.median(mod_ann[mod_ann!=0])}")
-    smaskmod=np.sqrt(mask_cutout.data*mod_cutout.data)
+    smaskmod=abs(np.sqrt(mask_cutout.data*mod_cutout.data))
+    print('smaskmod',smaskmod)
     # print(np.min(mask_cutout.data), np.min(mod_cutout.data))
     fits.writeto("../OUTPUT/"+gxyid+'/'+gxy_name2+"_smaskmod.fits", smaskmod.astype(np.float32), overwrite=True)
     smaskmod=np.ma.masked_equal(smaskmod,0)
+    print('smaskmod',smaskmod)
     ps_mask=np.fft.fft2(smaskmod)
+    print('ps_mask',ps_mask)
     # print(" **************** SHAPES******************")
     # print("SMASKMOD ", smaskmod.shape)
     # print("PS_MASK ", ps_mask.shape)
@@ -2316,6 +2352,7 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     
     
     # # PSF POWER SPECTRUM
+    
     psf_arr=psf_arr-1
     p0=np.zeros(psf_arr.shape)
     p1=np.zeros(psf_arr.shape)
@@ -2366,6 +2403,10 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         plt.title(f"{gxyid} $i$: $P(k)$",fontsize='small')
         # # plt.legend()
     
+    
+        
+        #Power spectrum of PSF
+    
         epsf_2=fits.open(f"../OUTPUT/{gxyid}/{gxy_name2}_psfstar_{pnum}.fits", do_not_scale_image_data=True)
         epsf2_data=epsf_2[0].data
 
@@ -2392,8 +2433,10 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # CONVOLVE PSF POWSPEC WITH MASK POWSPEC
         print("CONVOLVING PSF PS with MASK PS")
         teststart=time.time()
-
+        
+        
         ps_psf_conv=convolve(ps_mask, ps_psf2, mode='same', method='fft')
+        print('ps_psf_conv',ps_psf_conv)
         ps_psf_path=f"../OUTPUT/{gxyid}/{gxy_name2}_ps_psfconv_star{pnum}.fits"
         fits.writeto(ps_psf_path, ps_psf_conv.astype(np.float32), overwrite=True)
         # ps_psf_conv=convolve(ps_mask,ps_psf2,normalize_kernel=True)
@@ -2404,8 +2447,8 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         plt.subplot(234)
         vmin=0.9*np.min(epsf_2[0].data)
         vmax=0.95*np.max(epsf_2[0].data)
-        # print("VMIN VMAX 234")
-        # print(vmin<=vmax)
+        print("VMIN VMAX 234")
+        print(vmin<=vmax)
         plt.imshow(epsf_2[0].data, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
         plt.title("EPSF")
 
@@ -2437,7 +2480,7 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # plt.grid(True)
         
         
-        plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_powspec_ann{ann}_star{pnum}.jpeg',dpi=300)
+        # plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_powspec_ann{ann}_star{pnum}.jpeg',dpi=300)
         #plt.show(block=False)
         plt.clf()
         plt.close()
@@ -2490,10 +2533,13 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # print(kmed2)
         # print(kmed_psf2)
         k=np.array(kmed2)
-        # print(len(k))
+        print(k)
+        #print(len(k))
         P_k=np.array(flux2[:,0])
+        print(P_k)
         # print(len(P_k))
         E_k=np.array(flux_psf2[:,0])
+        print(E_k)
         cond_k=(k<450) #(int(cutout2.shape[0]/2.5)))
         print("&&&&&&&&&&&&&&&&&&&")
         # print(cond_k)
@@ -2503,6 +2549,8 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # k=k[(cond_k)]
 
         np.savetxt(f'../OUTPUT/{gxyid}/{gxy_name2}_k_Pk_Ek_ann{ann}_star{pnum}.txt', np.c_[k,P_k,E_k])
+        
+    
         
         P_0,P_1=utils.sbf_ps_fit(k[(cond_k)],E_k[(cond_k)],P_k[(cond_k)])
         # print(len(k[cond_k]))
