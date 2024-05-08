@@ -1658,8 +1658,7 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     plt.show()
     plt.clf()
     plt.close(fig)
-    
-    
+      
     print(len(stars))
     
     print('Number of selected stars',len(stars),'\n\n')
@@ -2536,10 +2535,10 @@ def sbf_ps_fit(k,E_k,P_k):
     ## ITERATIVE CURVE FITTING
     P_0=[]
     P_1=[]
-    for i in range(int(len(E_k)/2)):
-        
+    for i in range(int(len(E_k))):
+        # print('Ek[i:]',E_k[i:])
         # print(i)
-        popt_ps, pcov_ps=curve_fit(sbf_ps, E_k[i:], P_k[i:], p0=[30,70], bounds=(0,np.inf))
+        popt_ps, pcov_ps=curve_fit(sbf_ps, E_k[i:], P_k[i:], bounds=(0,np.inf))
         # print(popt_ps)
         P_0.append(popt_ps[0])
         P_1.append(popt_ps[1])
@@ -2548,7 +2547,7 @@ def sbf_ps_fit(k,E_k,P_k):
     
     # fig = plt.figure(figsize=(7, 7))
     # font = {'family' : 'serif',
-    #         'weight' : 'normal',
+    #         'weight' : 'normal',az
     #         'size'   : 22}
     
     # plt.rc('font', **font)
@@ -2564,6 +2563,34 @@ def sbf_ps_fit(k,E_k,P_k):
 
     return np.array(P_0), np.array(P_1)
 
+def moving_median_mad(arr, window_size=50):
+    
+    
+    n = len(arr)
+    median_list = []
+    mad_list = []
+    rms_list=[]
+
+    for i in range(n - window_size + 1):
+        # Select the window
+        window = arr[i:i+window_size]
+        
+        # Calculate median
+        median = np.median(window)
+        median_list.append(median)
+        
+        # Calculate MAD (median absolute deviation)
+        mad = np.median(np.abs(window - median))
+        mad_list.append(mad)
+        
+        #rms
+        rms_=np.sqrt(np.mean(np.array(arr)**2))
+        rms_list.append(rms_)
+        
+        median_list= [x for x in median_list if x > 0]
+        mad_list=[x for x in mad_list if x > 0]
+        rms_list=[x for x in rms_list if x > 0]
+    return median_list, mad_list, rms_list
 
 def sbf_ps(E_k,P_0,P_1):
     return P_0*E_k+P_1
