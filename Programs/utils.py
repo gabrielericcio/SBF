@@ -456,6 +456,7 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     
     #load catalog
     tsex = Table.read(catfilepath, format='ascii')
+    print('len(tsex)',len(tsex), '\n\n')
     
     #Source selection ttmp: big aperture not too bright, not too faint, stars
     ttmp=tsex[(tsex['MAG_APER_11']>mbright) & (tsex['MAG_APER_11']<mfaint) & (tsex['CLASS_STAR']>csmin)] 
@@ -470,9 +471,11 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     
     #Source selection clean: No aperture magnitude fainter than threshold
     tclean=tsex[(tsex['MAG_AUTO']<threshold) & (tsex['MAG_APER_1']<threshold) & (tsex['MAG_APER_2']<threshold) & (tsex['MAG_APER_11']<threshold)]
+    print('len(tclean)',len(tclean), '\n\n')
     
     #Source selection clean and compact: compact and no problems with sextractor
     tclean_cpt=tclean[(tclean['CLASS_STAR']>csmin)& (tclean['FLAGS']==0)]
+    print('len(tclean_cpt)',len(tclean_cpt), '\n\n')
     
     #Magnitude difference for aperture 2-0: Compact sources
     ci_cpt=(tclean_cpt['MAG_APER']-tclean_cpt['MAG_APER_2'])
@@ -491,14 +494,16 @@ def sbf_aper_corr(catfilepath, rad_asec, gxyid, band,csmin,mfaint,mbright,thresh
     
     #Source seelection: clean, compact and adeguate for aperture correction
     tclean_cpt=tclean[apercorr_cond]
+    print('len(tclean_cpt)',len(tclean_cpt), '\n\n')
     
     #Source selection: MAG_AUTO bright, clean, compact and adeguate for aperture correction
     tbright_cpt=tclean_cpt[(tclean_cpt['MAG_AUTO']<mfaint) & (tclean_cpt['MAG_AUTO']>mbright)]
-
+    print('len(tbright_cpt)',len(tbright_cpt), '\n\n')
+    
     #Parte inutile, solo rinominare selezione gia fatta
     tsel=tbright_cpt#tsex[(tsex['CLASS_STAR']>csmin) & (tsex['FLAGS']==0) & (tsex['MAG_AUTO']<mfaint) & (tsex['MAG_AUTO']>mbright) ]
     tsel=tsel[((tsel['MAG_APER_1']-tsel['MAG_APER_11'])<(apc_med+apc_std))&((tsel['MAG_APER_1']-tsel['MAG_APER_11'])>(apc_med-apc_std))]
-    
+    print('len(tsel)',len(tsel), '\n\n')
     #Matching with the full sample
     skycoord_sel=SkyCoord(tsel['ALPHA_J2000'],tsel['DELTA_J2000'],unit=(u.deg, u.deg))
     idxsel, idxfull, d2d, d3d = skycoord_full.search_around_sky(skycoord_sel,rad_asec*u.arcsec)
@@ -1358,7 +1363,7 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     data2=hdul2[res_ext2].data
     wcs2=astropy.wcs.WCS(h2)
     
-    #Corrected matche cat i
+    #Corrected matched cat i
     
     sex2=Table.read(corrcat2path, format='ascii.commented_header')
     #Compact
@@ -1437,6 +1442,7 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     plt.ylabel('Concentration index 4-8 pix [mag]')
     plt.xlabel('mag_auto [mag]')
     plt.show(block=False)
+    plt.title('Initial star selection')
     plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_first.jpeg',dpi=300)
     plt.clf()
     plt.close()
@@ -1481,15 +1487,15 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     dec_psf=sex_psf['DELTA_J2000']
     
     #Plot the positions of the stars 
-    plt.figure(figsize=(10,7))
+    # plt.figure(figsize=(10,7))
     
-    plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
-    plt.scatter(ra_psf,dec_psf,s=2,marker='s',label='Selected isolated sources')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_isolated.jpeg',dpi=300)
-    plt.show()
-    plt.clf()
-    plt.close()
+    # plt.scatter(ra,dec, s=0.1,color='red',label='All catalog')
+    # plt.scatter(ra_psf,dec_psf,s=2,marker='s',label='Selected isolated sources')
+    # plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    # plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name1}_psfsel_isolated.jpeg',dpi=300)
+    # plt.show()
+    # plt.clf()
+    # plt.close()
 
     #Creation of the NDDdata to extract the cutout of the stars with photutils extract_stars
     
@@ -1543,7 +1549,7 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
     
     #Plot firs selection stars
     plt.scatter(magau[plt_clean_sex],sex['MAG_APER'][plt_clean_sex]-sex['MAG_APER_2'][plt_clean_sex],color='red',s=0.5)
-    plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=1)
+    plt.scatter(sex['MAG_AUTO'][psf_sel],sex['MAG_APER'][psf_sel]-sex['MAG_APER_2'][psf_sel],s=5)
     # plt.axvline(mcutbright,color='yellow')
     # plt.axvline(mcutfaint,color='yellow')
     
@@ -1679,7 +1685,7 @@ def twoband_psf_VCC(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2pat
 
         # print('NEED TO COMPARE PHOTOMETRY OF PSF WITH DAOPHOT')
         
-        return epsf2
+        return epsf2, len(stars)
 
 def choose_stars(res1path,res_ext1,corrcat1path,res2path,res_ext2,corrcat2path,
                 csmin,mcutfaint,mcutbright,rad_asec,threshold, psfsize,oversampling,
@@ -2259,7 +2265,9 @@ def azimuthal_avg(arr_2D,binsize=1) :
 
     rsamp=np.arange(0,R.max(),binsize)
     rmed=[np.mean([rsamp[n], rsamp[n+1]]) for n in np.arange(len(rsamp)-1)]
-    
+    # print('R',R)
+    # print('x0, y0', x0,y0)
+    # print('X Y',X)
     
     
     flux=[]
@@ -2425,6 +2433,7 @@ def radial_snr(sig_2D,noise_2D,binsize=1) :
 
 # from sklearn.linear_model import LinearRegression as linreg
 from sklearn.linear_model import HuberRegressor as huber
+
 def sbf_ps_fit(k,E_k,P_k):
     
     '''

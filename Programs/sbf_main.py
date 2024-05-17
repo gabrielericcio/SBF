@@ -22,13 +22,14 @@ import sbf_classes_v1 as sbf
 import numpy as np
 import sbf_pr as p_r
 from astropy.table import Table
-
+from scipy import stats
 t0=time.time()
 # galaxies = ['ic0745','ngc4753','ngc5813','ngc5831','ngc5839']
 # galaxies = ['vcc1025','vcc0828','vcc1146']
 # galaxies = ['ngc3308']
-#galaxies = ['vcc1025']
-galaxies=['vcc0140']
+galaxies = ['vcc0538']
+# galaxies=['vcc0230']
+# galaxies=['ngc1404']
 # bands=['i']
 #bands=['i']
 bands=['g','i']
@@ -60,7 +61,7 @@ for i in range(len(galaxies)) :
         init.default() # default for all galaxies
         init_spec = getattr(init, gxy) #specific initialisation for each galaxy
         init_spec()
-        #fwhm[bands[j]]=sbf.run_part1(rms=rms, remove_bkg=True) #IS BUILDING MODEL NOW
+        fwhm[bands[j]]=sbf.run_part1(rms=rms, remove_bkg=True,star_image=False) #IS BUILDING MODEL NOW
         #FWHM IS UPDATED CORRECTLY ONLY WHEN PART 1 IS RUN
         print('FWHM AAAAAA', fwhm)
         sbf.run_part2(alpha[bands[j]])
@@ -78,8 +79,9 @@ for i in range(len(galaxies)) :
     #VCC0122:
     # fwhm={'g':0.66,'i': 0.59} # KEEP ONLY WHEN NOT RUNNING PART 1
     # fwhm={'g': 0.875, 'i': 0.618}  #vcc0033
-    # fwhm={'g': 0.72182, 'i': 0.61336} #vcc0230
-    fwhm={'g': 0.8134499999999999, 'i': 0.5507150000000001} #vcc0140
+    # fwhm={'g': 0.6488900000000001, 'i': 0.6096199999999999} #vcc0230
+    # fwhm={'g': 0.8003600000000001, 'i': 0.63393} #vcc0140
+    # fwhm={'g': 0.059519999999999997, 'i': 0.059519999999999997} #ngc1404
     # Parameters for the aperture correction
     
     match_scale=1.2 #Multiplicative factor to the mean FWHM of the matched objects, serve to compute the matching radius
@@ -139,8 +141,8 @@ for i in range(len(galaxies)) :
     # out_rad=np.array([300])
     
     #VCC0140
-    in_rad=np.array([36])#*0.187#0.00187 # degrees 36 pix   0.0084 #
-    out_rad=np.array([240]) # 27.2 arcsec mik's 7th anullus
+    # in_rad=np.array([36])#*0.187#0.00187 # degrees 36 pix   0.0084 #
+    # out_rad=np.array([240]) # 27.2 arcsec mik's 7th anullus
 
     #VCC0033
     
@@ -152,10 +154,14 @@ for i in range(len(galaxies)) :
     # in_rad=np.array([36])#*0.187#0.00187 # degrees 36 pix   0.0084 #
     # out_rad=np.array([103]) # 27.2 arcsec mik's 7th anullus
 
-    #VCC0230
+    #VCC0538
     
-    # in_rad=np.array([16])#*0.187#0.00187 # degrees 36 pix   0.0084 #
-    # out_rad=np.array([68]) # 27.2 arcsec mik's 7th anullus
+    in_rad=np.array([16])#*0.187#0.00187 # degrees 36 pix   0.0084 #
+    out_rad=np.array([68]) # 27.2 arcsec mik's 7th anullus
+    
+    #NGC1404
+    # in_rad=np.array([36])#*0.187#0.00187 # degrees 36 pix   0.0084 #
+    # out_rad=np.array([450]) # 27.2 arcsec mik's 7th anullus
 
     cutout_size=1536
 
@@ -169,23 +175,29 @@ for i in range(len(galaxies)) :
 #Star Selection
 
     #VCC1025
-    # psf_stars= np.array([1,3,4,5])#([1,2,4,5]) 
+    # psf_stars= np.array([1,3,4,5])
     
-    #VCC1040
-    psf_stars= np.array([1,2,9,15])#([1,2,4,5]) 
+    # #VCC1040
+    # psf_stars= np.array([1,2,9,15])
     
     #VCC0033
-    # psf_stars= np.array([1,7,8,12,13,14,17])
+    # psf_stars= np.array([1,2,7,8,12,13,14,17])
     
     #VCC0230
-    # psf_stars= np.array([1,10])
+    # psf_stars= np.array([5,8,10])
     
     #VCC0538
-    # psf_stars= np.array([6])
+    psf_stars= np.array([2,3,4])
+    
+    #NGC1404
+    # psf_stars= np.array([14])
     
     p0=np.zeros(psf_stars.shape)
+    p0_gab=np.zeros(psf_stars.shape)
+    p0_mad=np.zeros(psf_stars.shape)
     p1=np.zeros(psf_stars.shape)
     p0_med=np.zeros(in_rad.shape)
+    p0_gab_med=np.zeros(in_rad.shape)
     p1_med=np.zeros(in_rad.shape)
     
     for r in range(len(in_rad)):
@@ -197,14 +209,16 @@ for i in range(len(galaxies)) :
         #             fwhm[bands[0]],fwhm[bands[1]],in_rad[r], out_rad[r], A[1], cutout_size,r)
 
 
-         p0,p1=sbf.run_part6_starpsf(galaxies[i],bands[0],bands[1],magzp[bands[0]],magzp[bands[1]],
+         p0,p1,p0_gab=sbf.run_part6_starpsf(galaxies[i],bands[0],bands[1],magzp[bands[0]],magzp[bands[1]],
                     fwhm[bands[0]],fwhm[bands[1]],in_rad[r], out_rad[r], A[1], cutout_size, psf_stars, r)
          print(p0)
          print(p1)
          p0_med[r]=np.median(p0)
+         p0_gab_med[r]=np.median(p0_gab)
+         p0_mad=stats.median_abs_deviation(p0_gab)
          p1_med[r]=np.median(p1)
     print("median P_0 by annulus:") 
-    print(p0_med)
+    print(p0_gab_med,'+-', p0_mad )
    
 
     print("P_1 by annulus:") 
@@ -217,7 +231,12 @@ for i in range(len(galaxies)) :
     
     t=Table([p0_med,p1_med, p_r_ann,p0_med-p_r_ann], names=('P0','P1','Pr','Pfluc'))
     print(t)
-    print('SBF Magnitude', -2.5*np.log10(p0_med-p_r_ann)+30)
+    print('SBF Magnitude NAND', -2.5*np.log10(p0_med-p_r_ann)+30)
+    
+    dy_dx = -2.5 * 30 / (p0_gab_med-p_r_ann) * np.log10(np.e)  # Derivative dy/dx
+    delta_y = np.abs(dy_dx) * p0_mad  # Propagated error
+    print('SBF Magnitude Gab', -2.5*np.log10(p0_gab_med-p_r_ann)+30, '+-', delta_y)
+    
 
 t1=time.time()
 t=(t1-t0)/60.0
