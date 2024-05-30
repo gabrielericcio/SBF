@@ -23,6 +23,7 @@ class GalaxyPhot:
     def __init__(self, table_path: str, mask_path: str, mask_ext: int, x0: int, y0: int, secperpixel: float, distance: float):
         
         #Initialization
+        
         tab=Table.read(table_path, format='ascii')
         # self.idx=tab['col1'] 
         # self.x=tab['col2'] 
@@ -110,19 +111,25 @@ class FitParams:
         self.cnorm=cnorm   # ??????????
         
 
-        ##PRESET PARAMETER
+        #Preset parameters
+        
         brightcut=[21.0,20.5,20.0,19.5,19.0,19.0,17.5,19.5]
         #            B    V    R    I    J    H    K  z_AB
+        
         # self.kscale = kscale
         self.snlim=snlim
         # icol=1 #dummy
         self.icolor=icolor #i-band
 
-        
+        #Distance limit from the central galaxy
         rlim=[np.min(galphot.r),np.max(galphot.r)/np.sqrt(2.)]
+        
+        #Magnitude limits
         mlim=[0,0,0,0]
         mlim[3] = brightcut[icolor]
         if((mlim[3]<15) or (mlim[3]>25)): mlim[3] = 20
+
+        #Errors calibration of FAINT objects (not used as MIchele says)
 
         # C We expect that:
         # C (1) This is FAINT object photometry so the errors are independent of m
@@ -145,19 +152,26 @@ class FitParams:
         # C     mlim(2) = C2
         # C     mlim(3) = rsky
         # C     mcut = 2.5*(mlim(1) - mlim(2)*alog10(1+mlim(3)/r(i)))
-
+        
+        #Coding of the previous theory
+        
         m=galphot.m
         dm=galphot.dm
         r=galphot.r
+        
+        #Faint magnitude selection criteria
         sel=(m>mlim[3]) & (dm>0.001) & (dm<2.5) & (r>rlim[0]) & (r<rlim[1])
         print('WARNING: NO FAINT MAGNITUDE CUT HAS BEEN APPLIED SO FAR')
 
         #initalize some params
+        
+        #Application of the faint magnitude sel
         tabsel=galphot.tab[sel]
         nfit=len(tabsel)
         # abcissa=np.zeros([2,nfit])
         # abcissa[0,]=1
-
+        
+        #y axis of the fit
         ordinate=np.log10(dm[sel])-0.4*m[sel]
         # print(m,dm)
         # ordinate=
@@ -165,26 +179,33 @@ class FitParams:
         rms=[]
         iter=1#500
         print('WARNING: THIS ALGORITHM NEEDS REFINEMENT, at its present status it takes a value of rsky that is ad hoc')
+        
+        #Fit
+        
         for itry in range(iter):
             rsky=rsky+drsky
             # nfit=0
             
+            #X axis for the fit
             abcissa=np.log10(1+rsky/r[sel])
             # print(abcissa)
             guess_a=0.
             guess_b=1.
             popt_lin,pcov_lin = curve_fit(func_linear,abcissa,ordinate,p0=[guess_a,guess_b])
 
-
-            # plt.scatter(abcissa,ordinate)
-            # plt.plot(abcissa,func_linear(abcissa, *popt_lin),color='C1')
-            # plt.show()
-            # plt.clf()
+            #Plot of the fit
+            plt.scatter(abcissa,ordinate)
+            plt.plot(abcissa,func_linear(abcissa, *popt_lin),color='C1')
+            plt.title('log dm=0.4 m + C1 + C2 log (1+RSKY/r) ')
+            plt.show()
+            plt.clf()
             # rmsval=np.sqrt(np.sum(np.diag(pcov_lin)))
-            diff=ordinate-func_linear(abcissa, *popt_lin)
-            rmsval=np.sqrt(np.mean(diff**2)-np.mean(diff)**2)
+            
             # print(rms)
 
+            #Estimation of the errors
+            diff=ordinate-func_linear(abcissa, *popt_lin)
+            rmsval=np.sqrt(np.mean(diff**2)-np.mean(diff)**2)
             rms.append(rmsval)
             # print(rsky,popt_lin, rms, rms2)
 
@@ -212,6 +233,9 @@ class FitParams:
         rsamp=np.arange(r1,r2+1,1)
         # print(r)
         # print(self.rlim)
+        
+        
+        #Azimuthal sum of the mask image
         mask_data=self.galphot.mask[self.galphot.mask_ext].data
         self.r_npix,self.npix=azimuthal_sum(mask_data, rsamp)
         
@@ -220,21 +244,25 @@ class FitParams:
 
 
 
-        
+        #Limiting signal to noise calculation
         rmin=np.min(r)
         rmax=np.max(r)
         emmin=np.min(m)
         emmax=np.max(m)
         emcut=2.5*(mlim[0]-mlim[1]*np.log10(1.+mlim[2]/r))
+        
         # plt.plot(r,emcut)
         # plt.show()
         # plt.clf()
         self.emcut=emcut
-        # self.emenv=np.max(emcut)
+        
+        #Upgrade of the limiting selection criteria
         sel_lims = (r>=rlim[0]) & (r<=rlim[1]) & (m>=mlim[3]) & (m<=emcut)
         self.galphot.nok=len(self.galphot.tab[sel_lims])
-        # print("nobs= ",nobs)
-        # print("nok= ",nok)
+        print('Nok:',self.galphot.nok)
+        
+        
+        #GCLF calibration
 
         # C Assume icolor = 0/1/2/3/4/5/6 for B/V/R/I/J/H/K
         # C GC maximum brightness: (from Harris Extragalactic Distance Scale)
@@ -257,11 +285,15 @@ class FitParams:
 
         # TOM in V, in Vegamag
         vabs=-7.4
-        emabs_arr=np.array([0.8,0.,-0.5,-1.,-1.62,-2.14,-2.23,-1.])
+        emabs_arr=np.array([0.8,0.,-0.5,-1.,-1.62,-2.14,-2.23,-1.]) #Color correction vor the T.O.
 
         self.emabs=emabs_arr[icolor]+vabs
+        print(self.emabs)
         self.cmax=galphot.distmod+self.emabs
-
+        
+        
+        #LF of bkg galaxies 
+        
         # C d logN / d m for gxy, Assume icolor = 0/1/2/3 for B/V/R/I, 
         # C Tyson gives slope = 0.48/0.42/0.39/0.34
         # C Gardner ApJL 415 L9 and Cowie ApJ 434 114 find more or less that
@@ -289,6 +321,7 @@ class FitParams:
         self.par=par
         self.fit_pars=par[:npar]
         self.fixed_pars=par[npar:]
+        
 
     def likely(self, fit_pars, fixed_pars):
 
@@ -301,8 +334,8 @@ class FitParams:
         # C Data is guaranteed to all lie within these limits
         # C
         # C Parameters are stored in /params/ common and referred to as equivalenced
-        # C #gxy/mag/pixel^2(m) = GNORM * 10**GAMMA * (m - mg)
-        # C #GC/mag/pixel^2(m,r) = CNORM * r**-ALPHA * exp(-((m)-CMAX)^2/(2*DELTA^2))
+        # C #gxy/mag/pixel^2(m) = GNORM * 10**GAMMA * (m - mg)                          - Galaxies LF
+        # C #GC/mag/pixel^2(m,r) = CNORM * r**-ALPHA * exp(-((m)-CMAX)^2/(2*DELTA^2))   - GCLF
         # C NFIT refers to how many of these parameters are being varied by the
         # C minimization routine. All are initially set, however.
         # C
@@ -312,6 +345,7 @@ class FitParams:
         # C and the lower magnitude limit (10)   
 
         pars=[*fit_pars,*fixed_pars]
+        
         beta=pars[0]
         alpha=np.abs(pars[1])  # ????
         cmax=pars[2]
@@ -331,7 +365,9 @@ class FitParams:
 
         
         # acc=1e-10
-
+        
+        #Galaxies LF
+        
         # C log N (sec^-2 mag^-2) = GAMMA * (m - mg)
         # C Tyson's prediction of how many background galaxies we should count
         # C is GSUM = Int { 10**(GAMMA*m) } * SECPERPIXEL^2 * 10**(-GAMMA*MG)
@@ -340,21 +376,24 @@ class FitParams:
         emgalsec=30.5
         tysonscale= galphot.secperpixel**2 * 10**(-1.*gamma*emgalsec)
 
-        # ??????
         # C If GAMMA has changed we need to recalculate the ML normalization
+        
         # print(len(npix))
         # print(len(grand(par,r)))
         r_npix=self.r_npix
         npix=self.npix
         # print(r_npix)
         # print(tysonscale, gamma)
-        gsum=np.sum(np.multiply(npix,grand(pars,r_npix)))*tysonscale/(gamma*np.log(10))
+        gsum=np.sum(np.multiply(npix,grand(pars,r_npix)))*tysonscale/(gamma*np.log(10)) #In log?
         # print(np.multiply(npix,grand(self.par,r_npix)))
+        
         # C If ALPHA, DELTA, or CMAX has changed, we need to redo more ML norm.
+        
         # print(len(npix))
         # print(len(crand(par,r)))
-        csum=np.sum(np.multiply(npix,crand(pars,r_npix)))*np.sqrt(np.pi/2.)*delta
+        csum=np.sum(np.multiply(npix,crand(pars,r_npix)))*np.sqrt(np.pi/2.)*delta #log of the exp part of the gaussian GCLF?
         # print(gsum,csum)
+        
         ### NH: I am not using the oldalpha, olbeta, oldgamma... variables
         #       because we can compute the sum each time without overheads
         #       and this minimizes the confusion of having too many variables
@@ -371,7 +410,6 @@ class FitParams:
 
         if ((beta>0.) & (beta<1.)): betaclip=beta
         else: betaclip=min(1.,max(0.,beta))
-        # print("Betaclip=",betaclip)
 
         r=galphot.r#tab['col4'] 
         m=galphot.m#tab['col12'] 
@@ -383,6 +421,7 @@ class FitParams:
 
         msel=galphot.m[(sel_lims)]
         rsel=galphot.r[(sel_lims)]
+        
         gdens=tysonscale*2*np.pi*rsel*10**(gamma*msel)
         # print(gdens)
         carg=-0.5*((msel-cmax)/delta)**2
@@ -397,7 +436,8 @@ class FitParams:
         # C We constrain NOK = CNORM*CSUM + GNORM*GSUM, and set 
         # C BETA = GNORM*GSUM/(CNORM*CSUM + GNORM*GSUM) = GNORM*GSUM / NOK
         # C Let us keep gnorm from dropping below 0.5
-
+        
+        #Here is set the minimum value gnorm to 0.5
         betamin=0.5*gsum/nok
         betamax=1.
 
@@ -417,7 +457,7 @@ class FitParams:
         if (wall>1e4):
             # print("Beta wall hit very hard   ", beta)
             wall=np.log(wall)**2
-        
+        # print('beta is:', betaclip, 'wall is:', wall)
         likely=likely+wall
 
         # amag0=19
@@ -483,11 +523,12 @@ class FitParams:
         print(f"Total # objects (nok): {self.galphot.nok}")
 
         print(f"Initial galaxy distance: {self.galphot.distance} Mpc")   
-        print(f"Final galaxy distance: {gcdist} Mpc")
+        print(f"Final galaxy distance: {gcdist} Mpc \n\n")
 
     def calc_p_r(self,  yessoft=0, npred=100, embin=0.5):
 
         # START FUNCTION FOR CALCULATION OF P_r
+        
         # C Compute residual variance as a function of radius and luminosity function
         # C We will write a file called xxx.lkr which has parameters
         # C observed and predicted N(m), N(r), res_var(r), etc
@@ -495,11 +536,14 @@ class FitParams:
         # C NANNULI is the number of annuli in which results are computed
         # C NMARG  is the number of bins for the marginal distributions
         # C NPRED  is the number of points where predicted results are reported
-
+        
+        
+        #Setting the magnitude bins
         emmin=np.min(self.galphot.m)
         emmax=np.max(self.galphot.m)
         em0=embin*int(emmin/embin)
         em1=embin*int(emmax/embin+0.999)
+        
         print("CALCULATING P_r")
         # print(em0,em1)
         nmarg=min(npred,round((em1-em0)/embin))
@@ -523,7 +567,8 @@ class FitParams:
         rann=np.zeros(nannuli)
         fracmarg=np.zeros(nmarg)
         rmarg=np.zeros(nmarg)
-
+        print('rmarg len',len(rmarg))
+        
         rmin=np.min(self.galphot.r)
         rmax=np.max(self.galphot.r)
         # print(len(self.npix))
@@ -533,28 +578,41 @@ class FitParams:
         # count=0
         rsamp=np.arange(round(rmin), round(rmax)+1)
         mask_data=self.galphot.mask[self.galphot.mask_ext].data
+        
+        #Calculate the median radius and the total counts in the annuli
         r_npix,npix=azimuthal_sum(mask_data, rsamp)
         # print(len(r_npix),len(rsamp))
+        
+        #
+        
+        #Assignment of fracann=total counts in the annulus, rann=radius * total counts of the annulus 
+        
         for i in range(len(r_npix)):
             # print(j)
             j=i+round(rmin)
             if ((j>=round(rlim[0])) & (j<round(rlim[1]))):
-                # print(j)
+                # print('i:',i,'\n\n')
+                # print('j',j,'\n\n')
                 ir=int(nannuli*(j-rlim[0])/(rlim[1]-rlim[0]))
+                # print('ir',ir,'\n\n')
                 # print(ir)
                 fracann[ir]+=npix[i]
+                # print('fracann',fracann,'\n\n')
                 rann[ir]+=j*npix[i]
-                # count=count+1
+                # print('rann',rann,'\n\n')
+                #count=count+1
             ir = int(nmarg*(j-rmin)/(rmax-rmin))
-            # print(ir)
+            #print(ir)
             fracmarg[ir]+=npix[i]
-            rmarg[ir]+=j*npix[i]
+            rmarg[ir]+=j*npix[i] #mean value of each nannuli?
             # print(i,j,int(rmax))
         # print(fracann)        
 
         # plt.plot(fracmarg, linestyle='None', marker='o')
         # plt.show()
         # plt.clf()
+        
+        #Normalization of rann and fracann?
         for i in range(len(rann)):
             rann[i]=rann[i]/max(1.,fracann[i])
             r0=rlim[0]+i/nannuli*(rlim[1]-rlim[0])
@@ -563,6 +621,7 @@ class FitParams:
         # plt.plot(fracann, linestyle='None', marker='o')
         # plt.show()
         # plt.clf()
+        
         for i in range(len(rmarg)):
             rmarg[i]=rmarg[i]/max(1.,fracmarg[i])
             r0=rmin+i/nmarg*(rmax-rmin)
@@ -571,24 +630,26 @@ class FitParams:
         # plt.plot(fracmarg, linestyle='None', marker='o')
         # plt.show()
         # plt.clf()
+        
         r=self.galphot.r
         m=self.galphot.m
         # print(self.galphot.nobs,len(r))
         count_r_dist=np.zeros(npred)
         count_m_dist=np.zeros(npred)
         count_rm_dist=np.zeros((npred,nannuli))
+        
         for i in range(self.galphot.nobs):
             j=int(nmarg*(r[i]-rmin)/(rmax-rmin)-0.001)
             # print(j)
-            if ((j>=0) & (j<npred)):
+            if ((j>=0) & (j<npred)): #Estimate how many objects in each nannuli?
                 count_r_dist[j]+=1
             k=int((m[i]-em0)/embin)
             # print(k)
             if ((k>=0) & (k<npred)):
-                count_m_dist[k]+=1
+                count_m_dist[k]+=1   #Estimate how many objects in each magnitude bin?
                 j = int(nannuli*(r[i]-rlim[0])/(rlim[1]-rlim[0])-0.001)
                 if ((j>=0) & (j<nannuli)):
-                    count_rm_dist[k,j]+=1
+                    count_rm_dist[k,j]+=1 #Estimate how many objects in each r and b bin?
 
         # print(count_rm_dist)
         # print(count_m_dist)
@@ -600,6 +661,7 @@ class FitParams:
         dens_r=np.zeros(nmarg)
         dens_m=np.zeros(nmarg)
         dens_rm=np.zeros((nmarg,nannuli))
+        
         for i in range(nmarg):
             r0=rmin+i/nmarg*(rmax-rmin)
             # print(r0)
@@ -627,7 +689,8 @@ class FitParams:
                 r0=rlim[0]+j/nannuli*(rlim[1]-rlim[0])
                 r1=rlim[0]+(j+1)/nannuli*(rlim[1]-rlim[0])
                 area=fracann[j]*np.pi*(r1**2-r0**2)*sqarcminperpix
-                dens_rm[i,j]=count_rm_dist[i,j]/embin/area
+                dens_rm[i,j]=count_rm_dist[i,j]/embin/area #Number of objects in each bin of r and m divided by area
+        
         self.dens_r=dens_r
         self.dens_m=dens_m
         self.dens_rm=dens_rm
@@ -643,6 +706,7 @@ class FitParams:
         dens_gc_tot=np.zeros(npred)
         dens_both=np.zeros((npred,nannuli))
         dens_both_tot=np.zeros(npred)
+        
         # C Get gxy density, save as dens(1,1)=dens_gxy
         # C Get GC total and annuli averages, save as dens(1,*), * = 2, 3... dens(1,2)=dens_gc_tot, dens(1,3..)=dens_gc
         # C Get both total and annuli averages, save as dens(2,*), * = 2, 3...dens(2,2)=dens_both_tot, dens(2,3..)=dens_both
@@ -655,7 +719,7 @@ class FitParams:
             gaussian = np.exp(-0.5*((em-self.cmax)/self.delta)**2)
             for j in range(len(r_npix)):
                 # print(j)
-                k=j+round(rmin)
+                k=j+round(rmin) 
                 gcdensity= self.cnorm*k**(-1.*self.alpha)*gaussian
                 if ((k>=round(rlim[0])) & (k<=round(rlim[1]))):
                     ir=int(nannuli*(j-rlim[0])/(rlim[1]-rlim[0]))
@@ -684,6 +748,7 @@ class FitParams:
         ind=np.arange(npred)
         rr=ind*rstep+round(rmin/2)
         # print(rstep)
+        
         # C Bright and faint magnitude limits
         emb=mlim[3]
         emf=2.5*(mlim[0] - mlim[1]*np.log10(1+mlim[2]/rr))
@@ -769,7 +834,7 @@ class FitParams:
 
         # C Excise down to this surface brightness (mag/pix^2) limit
         # C jpb: make fainter for ACS
-        # C      surfcut = 30
+        # C surfcut = 30
         surfcut=32
         rmin=max(2.,fwhm/2.)
         r=self.galphot.r
@@ -981,7 +1046,7 @@ def azimuthal_sum(arr_2D,rsamp) :
         flux.append(np.sum(arr_2D[l]))
         # print(rsamp[n],np.median(arr_2D[l]) )
     
-    # print(rmed,flux)
+    #print('Azimuthal average output \n\n','mean radius in the annuli',rmed,'Sum of the counts in the Annuli',flux)
     end=time.time()
     print(f"Total time in making azimuthal sum= {end-start} sec")
     return rmed,np.array(flux)
@@ -1021,9 +1086,12 @@ def main(galname, in_rad, out_rad):
     tstart=time.time()
     # table_path=f'../OUTPUT/{galname.upper()}/{galname}i_v1.mch'
     # mask_path=f'../OUTPUT/{galname.upper()}/mask_resid.fits'
+    table_path_g=f'../OUTPUT/{galname.upper()}/{galname.upper()}_g_p_r.cat'
     table_path=f'../OUTPUT/{galname.upper()}/{galname.upper()}_i_p_r.cat'
     # print(table_path)
+    mask_path_g=f'../OUTPUT/{galname.upper()}/{galname.upper()}_g_p_r_mask_cutout.fits'
     mask_path=f'../OUTPUT/{galname.upper()}/{galname.upper()}_i_p_r_mask_cutout.fits'
+    
     mask_ext=0
     x0=768
     y0=768
@@ -1035,62 +1103,84 @@ def main(galname, in_rad, out_rad):
     snlim=4
     # icol=1 #dummy
     icolor=3 #i-band
+    
     # C Initial guess for gxy/total number
     beta = 0.5 #0.7
+    
     # C Initial guess for d lnN / d lnr of GC distribution
     alpha = 0.5 #0.6
 
     cnorm=1.   # ??????????
+    
     # C Width of GC distribution
+    
     delta = 1.2
 
     rsky=50
     drsky=10
-
+    
+    print('Initial rsky + drsky',rsky, drsky,'\n\n')
+    
+    
     npar=3  # Fit first 3 parameters only
 
-
+    # Photometry of the bkg-subtracted catalog (see run_pr_cat)
     galphot=GalaxyPhot(table_path, mask_path, mask_ext, x0, y0, secperpixel, distance)
-
+    
+    galphot_g=GalaxyPhot(table_path_g, mask_path, mask_ext, x0, y0, secperpixel, distance)
+    
+    # Fit of the 
     fitparams=FitParams(galphot, beta, alpha, cnorm, delta, icolor, snlim, rsky, drsky, npar)
 
-    
-    
+    fitparams_g=FitParams(galphot_g, beta, alpha, cnorm, delta, icolor, snlim, rsky, drsky, npar)
+
+
     fit_pars=fitparams.fit_pars
     fixed_pars=fitparams.fixed_pars
+    
     print(f'Initial likelihood={fitparams.likely(fit_pars,fixed_pars)}')
 
         
     print(f"Initial Beta : {fitparams.beta}")
     print(f"Initial Alpha : {fitparams.alpha}")
-    print(f"Initial Cmax : {fitparams.cmax}")
+    print(f"Initial Cmax : {fitparams.cmax} \n\n")
     mini_like=minimize(fitparams.likely, x0=fitparams.fit_pars, args=(fitparams.fixed_pars), method="Nelder-Mead")
 
     # print(f"Final Beta : {fitparams.beta}")
     # print(f"Final Alpha : {fitparams.alpha}")
     # print(f"Final Cmax : {fitparams.cmax}")
-    print(mini_like)
+    # print(mini_like)
 
     # print(fitparams.__dict__)
     finparams=copy.deepcopy(fitparams)
-
+    
+    finparams_g=copy.deepcopy(fitparams_g)
     # print(finparams.alpha)
-    print('DISPLAYING FITTED PARAMETERS AND MEASURABLES:')
+    
+    print('DISPLAYING FITTED PARAMETERS AND MEASURABLES: \n\n')
+    
     finparams.post_fit(mini_like.x)
 
     finparams.calc_p_r(yessoft=1)
 
     fwhm=3 #in pixels
     finparams.init_mask(fwhm,kscale)
+    
+    finparams_g.init_mask(fwhm,kscale)
 
     finparams.stompout()
-
+    finparams_g.stompout()
+    
     bitmask_hdu=finparams.bitmask_hdu
+    bitmask_hdu_g=finparams_g.bitmask_hdu
+    
     bitmask_hdu.writeto(f"../OUTPUT/{galname.upper()}/{galname.upper()}_i_stompout.fits", overwrite=True)
+    bitmask_hdu.writeto(f"../OUTPUT/{galname.upper()}/{galname.upper()}_g_stompout.fits", overwrite=True)
 
     mod=fits.open(f'../OUTPUT/{galname.upper()}/{galname.upper()}_i_mod.fits', do_not_scale_image_data=True)
 
     p_r_ann=np.zeros(in_rad.shape)
+    
     for ann in range(len(in_rad)):
 
         ann_mask=finparams.make_ann_mask(rstart=in_rad[ann], rend=out_rad[ann])

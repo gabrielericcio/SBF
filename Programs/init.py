@@ -485,7 +485,7 @@ def default() :
     eps0=0.15 #Ellipticity
     pa0=45.*np.pi/180. #Position angle
     agxy=0.2             #Step for increasing SMA
-    maxrad=100       #Max radius for the fitting (in pixel)
+    maxrad=250       #Max radius for the fitting (in pixel)
     minrad=1        #Min radius for the fitting (in pixel)
     maskin=5   #Inner radius of the mask selection (arcsec)
     maskout=200 #Outer radius 
@@ -562,6 +562,110 @@ def vcc1025_i() :
 
 
 def vcc1025_g() :
+
+
+    global minsma0
+    global maxsma0
+    global sma0
+    global eps0 
+    global pa0 
+    global agxy 
+    global maxrad 
+    global minrad 
+    global maskin 
+    global maskout 
+    global nclip 
+    global sclip 
+    global maxit 
+    global box 
+    global fix_center 
+    global fix_pa 
+    global fix_eps 
+    global mask_scale_ext 
+    global mask_scale_cpt     
+    global fwhm0
+        
+        
+    #Galaxy geometry and initialization parameters
+    #
+    #0th order fit
+    # minsma0=250
+    # maxsma0=300
+    #sma0=250  #First annulus for ellipse fitting
+    eps0=0.1 #Ellipticity
+    pa0=15.*np.pi/180. #Position angle
+    # agxy=0.2            #Step for increasing SMA
+    # maxrad=550           #Max radius for the fitting
+    #minrad=40             #Min radius for the fitting
+    # maskin=5   #Inner radius of the mask selection (arcsec)
+    # maskout=120 #Outer radius 
+    nclip=8
+    sclip=2
+    # maxit=50
+    #fwhm0=0.7
+    #Fixing the center, pa and eps
+    # fix_center=False
+    # fix_pa=False
+    # fix_eps=False
+
+    #masking radii for compact and extended sources
+    mask_scale_ext=5
+    # #mask_scale_cpt=4
+
+
+def vcc1355_i() :
+
+
+    global minsma0
+    global maxsma0
+    global sma0
+    global eps0 
+    global pa0 
+    global agxy 
+    global maxrad 
+    global minrad 
+    global maskin 
+    global maskout 
+    global nclip 
+    global sclip 
+    global maxit 
+    global box 
+    global fix_center 
+    global fix_pa 
+    global fix_eps 
+    global mask_scale_ext 
+    global mask_scale_cpt     
+    global fwhm0
+        
+    #Galaxy geometry and initialization parameters
+    #
+    #0th order fit
+    #minsma0=250
+    #maxsma0=300
+    #sma0=270  #First annulus for ellipse fitting
+    eps0=0.1 #Ellipticity
+    pa0=15.*np.pi/180. #Position angle
+    # agxy=0.2           #Step for increasing SMA
+    # maxrad=450           #Max radius for the fitting
+    # minrad=1             #Min radius for the fitting
+    # maskin=5   #Inner radius of the mask selection (arcsec)
+    # maskout=200 #Outer radius 
+    #fwhm0=0.7
+    nclip=8
+    sclip=2
+
+    #Fixing the center, pa and eps
+    #fix_center=False
+    fix_pa=False
+    #fix_eps=False
+    
+    #masking radii for compact and extended sources
+    mask_scale_ext=5
+    # #mask_scale_cpt=4
+
+
+
+def vcc1355_g() :
 
 
     global minsma0
@@ -714,6 +818,109 @@ def vcc0033_g() :
     #masking radii for compact and extended sources
     mask_scale_ext=5
     # #mask_scale_cpt=4
+    
+def vcc0032_i() :
+
+
+    global minsma0
+    global maxsma0
+    global sma0
+    global eps0 
+    global pa0 
+    global agxy 
+    global maxrad 
+    global minrad 
+    global maskin 
+    global maskout 
+    global nclip 
+    global sclip 
+    global maxit 
+    global box 
+    global fix_center 
+    global fix_pa 
+    global fix_eps 
+    global mask_scale_ext 
+    global mask_scale_cpt     
+    global fwhm0
+        
+    #Galaxy geometry and initialization parameters
+    #
+    #0th order fit
+    #minsma0=250
+    #maxsma0=300
+    #sma0=270  #First annulus for ellipse fitting
+    eps0=0.1 #Ellipticity
+    pa0=15.*np.pi/180. #Position angle
+    # agxy=0.2            #Step for increasing SMA
+    # maxrad=200           #Max radius for the fitting
+    # minrad=1             #Min radius for the fitting
+    # maskin=5   #Inner radius of the mask selection (arcsec)
+    # maskout=200 #Outer radius 
+    #fwhm0=0.7
+    nclip=8
+    sclip=2
+
+    #Fixing the center, pa and eps
+    #fix_center=False
+    fix_pa=False
+    #fix_eps=False
+    
+    #masking radii for compact and extended sources
+    mask_scale_ext=5
+    # #mask_scale_cpt=4
+
+
+def vcc0032_g() :
+
+
+    global minsma0
+    global maxsma0
+    global sma0
+    global eps0 
+    global pa0 
+    global agxy 
+    global maxrad 
+    global minrad 
+    global maskin 
+    global maskout 
+    global nclip 
+    global sclip 
+    global maxit 
+    global box 
+    global fix_center 
+    global fix_pa 
+    global fix_eps 
+    global mask_scale_ext 
+    global mask_scale_cpt     
+    global fwhm0
+        
+        
+    #Galaxy geometry and initialization parameters
+    #
+    #0th order fit
+    # minsma0=250
+    # maxsma0=300
+    #sma0=250  #First annulus for ellipse fitting
+    eps0=0.1 #Ellipticity
+    pa0=15.*np.pi/180. #Position angle
+    # agxy=0.2            #Step for increasing SMA
+    # maxrad=200           #Max radius for the fitting
+    # minrad=1             #Min radius for the fitting
+    # maskin=5   #Inner radius of the mask selection (arcsec)
+    # maskout=200 #Outer radius  
+    nclip=8
+    sclip=2
+    # maxit=50
+    #fwhm0=0.7
+    #Fixing the center, pa and eps
+    # fix_center=False
+    # fix_pa=False
+    # fix_eps=False
+
+    #masking radii for compact and extended sources
+    mask_scale_ext=5
+    # #mask_scale_cpt=4
+
 
 
 def vcc0230_i() :
@@ -1504,102 +1711,4 @@ def ngc5839_g() :
     mask_scale_cpt=4
     
        
-def leda087327_f606w() :
 
-    global minsma0
-    global maxsma0
-    global sma0
-    global eps0 
-    global pa0 
-    global agxy 
-    global maxrad 
-    global minrad 
-    global maskin 
-    global maskout 
-    global nclip 
-    global sclip 
-    global maxit 
-    global box 
-    global fix_center 
-    global fix_pa 
-    global fix_eps 
-    global mask_scale_ext 
-    global mask_scale_cpt 
-    global fwhm0
-    global magzp
-    
-    
-    #Galaxy geometry and initialization parameters
-    #
-    #0th order fit
-    #minsma0=80
-    #maxsma0=150
-    #sma0=100  #First annulus for ellipse fitting
-    eps0=0.35 #Ellipticity
-    pa0=18.*np.pi/180. #Position angle
-    #agxy=0.2            #Step for increasing SMA
-    # maxrad=550           #Max radius for the fitting
-    #minrad=70             #Min radius for the fitting
-    # #maskin=5   #Inner radius of the mask selection (arcsec)
-    maskout=35 #Outer radius 
-    nclip=2
-    # #sclip=2
-    magzp=26.507
-    # #Fixing the center, pa and eps
-    # fix_center=False
-    #fix_pa=True
-    # fix_eps=True
-   
-    # #masking radii for compact and extended sources
-    mask_scale_ext=6
-    mask_scale_cpt=6
-
-def leda087327_f475w() :
-
-    global minsma0
-    global maxsma0
-    global sma0
-    global eps0 
-    global pa0 
-    global agxy 
-    global maxrad 
-    global minrad 
-    global maskin 
-    global maskout 
-    global nclip 
-    global sclip 
-    global maxit 
-    global box 
-    global fix_center 
-    global fix_pa 
-    global fix_eps 
-    global mask_scale_ext 
-    global mask_scale_cpt 
-    global fwhm0
-    global magzp
-    
-    
-    #Galaxy geometry and initialization parameters
-    #
-    #0th order fit
-    #minsma0=80
-    #maxsma0=250
-    #sma0=100  #First annulus for ellipse fitting
-    eps0=0.35 #Ellipticity
-    pa0=18.*np.pi/180. #Position angle
-    agxy=0.2            #Step for increasing SMA
-    # maxrad=550           #Max radius for the fitting
-    #minrad=70             #Min radius for the fitting
-    # #maskin=5   #Inner radius of the mask selection (arcsec)
-    maskout=35 #Outer radius 
-    nclip=2
-    # #sclip=2
-    magzp=26.071
-    # #Fixing the center, pa and eps
-    # fix_center=False
-    #fix_pa=True
-    # fix_eps=True
-   
-    # #masking radii for compact and extended sources
-    #mask_scale_ext=6
-    mask_scale_cpt=6

@@ -24,12 +24,13 @@ from astropy.wcs import WCS
 from astropy.io import fits
 from matplotlib.colors import LogNorm
 import matplotlib.colors as colors
+from matplotlib.patches import Circle
 
 from photutils.isophote import EllipseGeometry
 #from photutils.isophote import EllipseSample
 from photutils.aperture import EllipticalAperture
 from photutils.isophote import Ellipse
-
+from subprocess import call
 
 from photutils.isophote import build_ellipse_model
 
@@ -46,6 +47,7 @@ from astropy.wcs.utils import skycoord_to_pixel
 from astropy.nddata.utils import Cutout2D
 from scipy.optimize import curve_fit 
 import matplotlib.transforms as transforms
+from astropy.visualization import simple_norm
 
 from regions import EllipseSkyRegion, CircleSkyRegion, CirclePixelRegion
 from astropy.coordinates import SkyCoord
@@ -719,7 +721,6 @@ def run_part2(alpha) :
     
     # Generate sextractor file using sewpy 
     
-    
     sewpyconf={"PARAMETERS_NAME":"../INPUT/UTILS/part2.param.lsst",
                           "FILTER_NAME":"../INPUT/UTILS/gauss_3.0_5x5.conv",
                           "STARNNW_NAME":"../INPUT/UTILS/default.nnw",
@@ -1108,6 +1109,9 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     gxyid=gal.gxy
 
     plate_scale=gal.plate_scale
+    fwhm_pixel=[fwhm1/plate_scale,fwhm2/plate_scale]
+    print('FFWHM',fwhm_pixel)
+    
     img_ext=gal.img_ext #Image extension
     wht_ext=gal.wht_ext #Weight extension
     res_ext=0
@@ -1144,80 +1148,178 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
 
     
     # Generate EPSF
-    rad_asec=np.mean([fwhm1,fwhm2])*psf_rad_scale
+    # rad_asec=np.mean([fwhm1,fwhm2])*psf_rad_scale
+    rad_asec=np.mean([fwhm1,fwhm2])*np.array(psf_rad_scale)
+    print('rad_asec',rad_asec)
     
     # epsf1,epsf2=utils.twoband_psf(resimg1,res_ext,match1path,resimg2,res_ext,match2path,
     #                               cscut,mfaint,mbright,rad_asec,threshold,psfsize,oversampling,
     #                               gxyid,gxy_name1,gxy_name2,nthfactor, rgc_factor)
     
-    epsf2,nstars=utils.twoband_psf_VCC(mbkimg1,res_ext,match1path,mbkimg2,res_ext,match2path,
+    epsf2,stars_indices_chi=utils.PSF_sel(mbkimg1,res_ext,match1path,mbkimg2,res_ext,match2path,
                                   cscut,mfaint,mbright,rad_asec,threshold,psfsize,oversampling,
-                                  gxyid,gxy_name1,gxy_name2,nthfactor, rgc_factor, 
+                                  gxyid,gxy_name1,gxy_name2,fwhm_pixel,nthfactor, rgc_factor, 
                                   seg_path=f"../OUTPUT/{gxyid}/i_seg.fits")
+    print(stars_indices_chi)
     
     psfpath="../OUTPUT/"+gxyid+'/'+gxy_name2+'_epsf.fits'
     fits.writeto(psfpath, epsf2.data.astype(np.float32), overwrite=True)
     
     
-    #Stars PSF analysis
-    fig, axs = plt.subplots(nstars,2, figsize=(30,100))
+    ''' 
+    Gab Star Psf selection
+    '''
     
-    flux_per_k=np.zeros(nstars)
-    dispersion=np.zeros(nstars)
-    variance_arr=np.zeros(nstars)
-    widht=np.zeros(nstars)
-    for i in range(nstars): 
-        
-        psf=fits.open(f"../OUTPUT/{gxyid}/{gxy_name2}_psfstar_{i}.fits", do_not_scale_image_data=True)
-        psf_data=psf[0].data
+    # #Stars PSF analysis
+    # fig, axs = plt.subplots(nstars+1,3, figsize=(40,150))
     
-        rmed_psf, fluxmed_psf=utils.azimuthal_avg(psf_data, binsize=1)
-        print(rmed_psf)
-        # fluxmed_psf[:,0]=fluxmed_psf[:,0]/max(fluxmed_psf[:,0])
-        # print(fluxmed_psf)
-        # print(fluxmed_psf[:,1])
-        # print('fluxmed_psf[:,0]',fluxmed_psf[:,0])
+    # fwhm_scale=5
+    # fwhm_norm=2
+    # binsize_middle=1
+    # N_norm=int(round(fwhm_norm*fwhm_pixel[1])/binsize_middle)
+
+    # flux_per_k=[]
+    # std_arr=[]
+    
+    # dispersion=np.zeros(nstars)
+    # variance_arr=np.zeros(nstars)
+    # widht=np.zeros(nstars)
+    # for i in range(nstars): 
+    #     #Image acquisition
         
-        #variance method
+    #     psf=fits.open(f"../OUTPUT/{gxyid}/{gxy_name2}_psfstar_{i}.fits", do_not_scale_image_data=True)
+    #     psf_data=psf[0].data
+    
+    #     #Azimuthal average
+    #     rmed_psf, fluxmed_psf,summ_flux, narr_middle=utils.azimuthal_avg_circle_middle(psf_data,fwhm_pixel[1],fwhm_scale=fwhm_scale, binsize_middle=binsize_middle,binsize_after=3)
         
-        summa=np.nansum(max(fluxmed_psf[:,0])-fluxmed_psf[:,0])**2
-        variance= summa/(len(rmed_psf)-1)
-        # print(fluxmed_psf[:,0], rmed_psf)
-        variance_arr[i] = variance
+        
+    #     #Normalization
+
+    #     fluxmed_psf[:,0]=fluxmed_psf[:,0]/np.sum(summ_flux[:N_norm])
+    #     fraction_err=utils.frac_err(fluxmed_psf[:,0],fluxmed_psf[:,1],np.sum(summ_flux[:N_norm]),np.sqrt(np.sum(summ_flux[:N_norm])))
+
+        
+    #     #Append for median and std
+    #     flux_per_k.append(fluxmed_psf[:,0])
+    #     std_arr.append(np.std(fraction_err[:narr_middle]))
+    
+    # #Model creation (median of the curves)
+    # stars_azim=np.vstack(flux_per_k)
+    # flux_median_distribution = np.median(stars_azim, axis=0)
+    # rms_distribution = np.sqrt(np.mean(stars_azim**2, axis=0))
+    # # print('Model',flux_median_distribution)
+   
+    
+    # # fig, axs = plt.subplots(figsize=(10,10))
+    
+    # rms_from_model_arr=[]
+    
+    # for i in range(nstars): 
+        
+    #     #Image acquisition
+       
+    #     psf=fits.open(f"../OUTPUT/{gxyid}/{gxy_name2}_psfstar_{i}.fits", do_not_scale_image_data=True)
+    #     psf_data=psf[0].data
+        
+    #     #Azimuthal average
+        
+    #     rmed_psf, fluxmed_psf,summ_flux,narr_middle=utils.azimuthal_avg_circle_middle(psf_data,fwhm_pixel[1],fwhm_scale=fwhm_scale, binsize_middle=binsize_middle,binsize_after=3)
+        
+    #     #Normalization and error propagation
+        
+        
+    #     fluxmed_psf[:,0]=fluxmed_psf[:,0]/np.sum(summ_flux[:N_norm])
+    #     fraction_err=utils.frac_err(fluxmed_psf[:,0],fluxmed_psf[:,1],np.sum(summ_flux[:N_norm]),np.sqrt(np.sum(summ_flux[:N_norm])))
+        
+    #     #RMSE/chi_square calculation
+    #     rms_from_model=utils.chi_square_test(fluxmed_psf[:,0],flux_median_distribution)
+    #     rms_from_model_arr.append(rms_from_model)
+        
+    #     #plot
+    #     axs[i,0].errorbar(rmed_psf, fluxmed_psf[:,0], yerr=abs(fraction_err), label=f"Star {i}",capsize=3)
+    #     axs[i, 0].fill_between(rmed_psf, fluxmed_psf[:,0] - abs(fraction_err), fluxmed_psf[:,0] + abs(fraction_err), color='lightblue', alpha=0.5, label='Error')
+    #     # axs.set_xlim(0,7)
+    #     axs[i,0].set_yscale('log')
+    #     # axs[i,0].set_xscale('log')
+    #     axs[i,0].set_title(f"Star {i}")
+            
+    #     # axs[i,0].set_xlim(5, 30)
+    #     axs[i,0].set_xlabel("r (pixel)")
+    #     axs[i,0].set_ylabel("flux (azim avg, counts)")
+        
+    #     vmin=-2
+    #     vmax=7
+        
+    #     norm = simple_norm(psf_data, 'log', percent=99.5)
+        
+    #     axs[i, 1].imshow(psf_data, vmin=vmin,vmax=vmax, origin='lower', cmap='gray')
+        
+    #     axs[i, 2].imshow(psf_data, norm=norm, origin='lower', cmap='gray')
+    #     # axs[i, 1].set_title(f"Star Image - Iteration {i+1}")
+    #     # axs[i, 1].axis('off')
+        
+    #     # Add red circle to the image
+    #     radius =  fwhm_pixel[1]*fwhm_scale # min(psf_data.shape) / 2
+    #     center = np.array(psf_data.shape) / 2
+    #     circle = Circle(center, radius, color='red', fill=False)
+    #     axs[i, 1].add_patch(circle)
+        
+    #     # Calculate residuals
+    #     residuals = (fluxmed_psf[:,0] - flux_median_distribution)**2/flux_median_distribution
+        
+    #     # Create a subplot below the current plot
+    #     axs_residual = axs[i, 0].inset_axes([0, -0.3, 1, 0.3])
+        
+    #     # Plot residuals
+    #     axs_residual.plot(rmed_psf, residuals, marker='o', linestyle='-')
+    #     # axs_residual.set_xlabel("r (pixel)")
+    #     axs_residual.set_ylabel("Residuals")
+    #     axs_residual.grid(True)
+    #     axs_residual.set_ylim(1e-10,1)
+    #     axs_residual.set_yscale('log')
         
     
+    # #Select the best psf
     
-    print('variance array',variance_arr)
-    print('min variance', min(variance_arr), 'for the star number', np.argmin(variance_arr))
+    # #Chi
+    # sorted_indices_chi = np.argsort(rms_from_model_arr)
+    # stars_indices_chi = sorted_indices_chi[:5]
+    
+    # #std
+    
+    # sorted_indices_std = np.argsort(std_arr)
+    # stars_indices_std = sorted_indices_std[:5]
+
+    # print("Stars with lowest chi from the model:", stars_indices_chi,'\n', 'Corrispective RMS',np.sort(rms_from_model_arr)[:5],'\n\n')
+    # print("Stars with lowest std:", stars_indices_std,'\n', 'Corrispective RMS',np.sort(std_arr)[:5],'\n\n')
+        
+    
+    # axs[nstars,0].errorbar(rmed_psf, flux_median_distribution, yerr=rms_distribution, label='model',capsize=3)
+    # axs[nstars, 0].fill_between(rmed_psf, flux_median_distribution - abs(rms_distribution), flux_median_distribution + abs(rms_distribution), color='lightblue', alpha=0.5, label='Error')
+    # # axs.set_xlim(0,7)
+    # axs[nstars,0].set_yscale('log')
+    # # axs[i,0].set_xscale('log')
+    # axs[nstars,0].set_title("Median")
+        
+    # # axs[i].set_xlim(0, 7)
+    # axs[nstars,0].set_xlabel("r (pixel)")
+    # axs[nstars,0].set_ylabel("flux (azim avg, counts)")   
+    
+    # axs[nstars,1].plot(stars_indices_chi,np.sort(rms_from_model_arr)[:5], marker='o',markersize=5)
+    # axs[nstars,1].set_title(f'Stars with chi: {stars_indices_chi}',fontsize=20)
+    
+    # axs[nstars,2].plot(stars_indices_std,np.sort(std_arr)[:5], marker='o',markersize=5)
+    # axs[nstars,2].set_title(f'Stars with std: {stars_indices_std}',fontsize=20)
+    
+    
+    # plt.subplots_adjust(hspace=0.1)
     # plt.tight_layout()
     # plt.show()
     
-    # fig, axs = plt.subplots(figsize=(10,10))
-    for i in range(nstars): 
-        
-        psf=fits.open(f"../OUTPUT/{gxyid}/{gxy_name2}_psfstar_{i}.fits", do_not_scale_image_data=True)
-        psf_data=psf[0].data
-        rmed_psf, fluxmed_psf=utils.azimuthal_avg(psf_data)
-        
-            
-     
-        axs[i,0].errorbar(rmed_psf, fluxmed_psf[:,0], yerr=fluxmed_psf[:,1], label=f"Star {i}",capsize=3)
-        axs[i, 0].fill_between(rmed_psf, fluxmed_psf[:,0] - fluxmed_psf[:,1], fluxmed_psf[:,0] + fluxmed_psf[:,2], color='lightblue', alpha=0.5, label='Error')
-        # axs.set_xlim(0,7)
-        axs[i,0].set_yscale('log')
-        # axs[i,0].set_xscale('log')
-        axs[i,0].set_title(f"Star {i}")
-            
-        # axs[i].set_xlim(0, 7)
-        axs[i,0].set_xlabel("r (pixel)")
-        axs[i,0].set_ylabel("flux (azim avg, counts)")
-        
-        axs[i, 1].imshow(psf_data, vmin=-2,vmax=5, origin='lower', cmap='gray')
-        # axs[i, 1].set_title(f"Star Image - Iteration {i+1}")
-        # axs[i, 1].axis('off')
     
-    plt.tight_layout()
-    plt.show()
+    
+    
     
     #Reshape the Epsf data to compensate the oversampling
     
@@ -1363,7 +1465,7 @@ def run_part5(gxyid, band1,band2, ext_corr1, ext_corr2,magzp1,magzp2,fwhm1,fwhm2
     #######################################################################
     #plt.show()
     #plt.clf()
-    
+    return (stars_indices_chi)
 
 
 def run_pr_cat(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, cutout_size, 
@@ -2341,7 +2443,7 @@ def run_part6(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
 
 
 def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2, 
-                in_rad, out_rad, ext_corr2, cutout_size, psf_arr, r):
+                in_rad, out_rad, ext_corr2, cutout_size, psf_arr, r,k_cond):
 
     
     
@@ -2609,7 +2711,7 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     
     # # PSF POWER SPECTRUM
     
-    psf_arr=psf_arr-1
+    psf_arr=psf_arr #-1 nandini
     p0=np.zeros(psf_arr.shape)
     p0_gab=np.zeros(psf_arr.shape)
     p1=np.zeros(psf_arr.shape)
@@ -2617,7 +2719,7 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
     
     for pnum in psf_arr:
         
-        #Plot
+        # #Plot
         
         fig = plt.figure(figsize=(18, 12))
         font = {'family' : 'serif',
@@ -2629,32 +2731,32 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
                             bottom=0.15, top=0.9)
         
         cmap='viridis'   
-        # plt.subplot(221)
-        # vmin=np.min(ps1)
-        # vmax=0.95*np.max(ps1)
-        # plt.imshow(ps1, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        # # plt.subplot(221)
+        # # vmin=np.min(ps1)
+        # # vmax=0.95*np.max(ps1)
+        # # plt.imshow(ps1, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
 
-        # plt.subplot(222)
+        # # plt.subplot(222)
+        # # vmin=0.001
+        # # vmax=0.95*np.max(resdata1)
+        # # plt.imshow(resdata1, origin='lower', cmap=cmap,norm=LogNorm(vmin=vmin, vmax=vmax))
+        
+        # plt.subplot(232)
+        # vmin=np.min(ps2)
+        # vmax=0.95*np.max(ps2)
+        # plt.imshow(ps2, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        
+        # plt.subplot(231)
         # vmin=0.001
-        # vmax=0.95*np.max(resdata1)
-        # plt.imshow(resdata1, origin='lower', cmap=cmap,norm=LogNorm(vmin=vmin, vmax=vmax))
+        # vmax=0.95*np.max(cutout2.data)
         
-        plt.subplot(232)
-        vmin=np.min(ps2)
-        vmax=0.95*np.max(ps2)
-        plt.imshow(ps2, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
-        
-        plt.subplot(231)
-        vmin=0.001
-        vmax=0.95*np.max(cutout2.data)
-        
-        plt.imshow(cutout2.data, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
-        plt.subplot(233)
-        plt.plot(kmed2,np.log10(flux2[:,0]),color='indigo',label=gxy_name2)
-        plt.xlabel('$k$')
-        plt.ylabel('$log(P)$')
-        plt.title(f"{gxyid} $i$: $P(k)$",fontsize='small')
-        plt.show()
+        # plt.imshow(cutout2.data, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        # plt.subplot(233)
+        # plt.plot(kmed2,np.log10(flux2[:,0]),color='indigo',label=gxy_name2)
+        # plt.xlabel('$k$')
+        # plt.ylabel('$log(P)$')
+        # plt.title(f"{gxyid} $i$: $P(k)$",fontsize='small')
+        # plt.show()
         # # plt.legend()
     
     
@@ -2701,21 +2803,21 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
 
         #Plot 
         
-        plt.subplot(234)
-        vmin=0.9*np.min(epsf_2[0].data)
-        vmax=0.95*np.max(epsf_2[0].data)
-        print("VMIN VMAX 234")
-        print(vmin<=vmax)
-        plt.imshow(epsf_2[0].data, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
-        plt.title("EPSF")
-
-        plt.subplot(235)
-        vmin=0.9*np.min(ps_psf_conv)
-        vmax=0.95*np.max(ps_psf_conv)
-        # print("VMIN VMAX 235")
+        # plt.subplot(234)
+        # vmin=0.9*np.min(epsf_2[0].data)
+        # vmax=0.95*np.max(epsf_2[0].data)
+        # print("VMIN VMAX 234")
         # print(vmin<=vmax)
-        plt.imshow(ps_psf_conv, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
-        plt.title("PS PSF conv")
+        # plt.imshow(epsf_2[0].data, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        # plt.title("EPSF")
+
+        # plt.subplot(235)
+        # vmin=0.9*np.min(ps_psf_conv)
+        # vmax=0.95*np.max(ps_psf_conv)
+        # # print("VMIN VMAX 235")
+        # # print(vmin<=vmax)
+        # plt.imshow(ps_psf_conv, origin='lower',cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        # plt.title("PS PSF conv")
 
 
         print("AZIM AVG PSF CONV POWER SPECTRUM\n\n")
@@ -2728,12 +2830,12 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         
         #Plot
         
-        plt.subplot(236)
-        plt.plot(kmed_psf2,np.log10(flux_psf2[:,0]),color='darkred',label='PSF PS '+gxy_name2)
-        plt.xlabel('$k$')
-        plt.ylabel('$log(P)$')
-        plt.title(f"{gxyid} $i$: $E(k)$",fontsize='small')
-        # plt.legend()
+        # plt.subplot(236)
+        # plt.plot(kmed_psf2,np.log10(flux_psf2[:,0]),color='darkred',label='PSF PS '+gxy_name2)
+        # plt.xlabel('$k$')
+        # plt.ylabel('$log(P)$')
+        # plt.title(f"{gxyid} $i$: $E(k)$",fontsize='small')
+        # # plt.legend()
         
         # plt.yscale('log')
         #plt.ylim(-5,1)
@@ -2741,10 +2843,10 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         
         
         # plt.savefig(f'../OUTPUT/plots/{gxyid}/{gxy_name2}_powspec_ann{ann}_star{pnum}.jpeg',dpi=300)
-        #plt.show(block=False)
-        plt.show()
-        plt.clf()
-        plt.close()
+        # #plt.show(block=False)
+        # plt.show()
+        # plt.clf()
+        # plt.close()
         
         
         
@@ -2762,24 +2864,24 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         cmap='viridis'   
         
         plt.subplot(121)
-        vmin=0.9*np.min(epsf_2[0].data)
-        vmax=0.95*np.max(epsf_2[0].data)
+        vmin=-2
+        vmax=7
         # print("VMIN VMAX 121")
         # print(vmin<=vmax)
-        plt.imshow(epsf_2[0].data, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        plt.imshow(epsf_2[0].data, vmin=vmin,vmax=vmax, origin='lower', cmap='gray')
         # plt.xlabel('$k$')
         # plt.ylabel('$log(P)$')
-        plt.title(f"PSF",fontsize='small')
+        plt.title(f"PSF {pnum}",fontsize='small')
         # plt.legend()
         plt.subplot(122)
-        vmin=0.9*np.min(psf2_stitched)
-        vmax=0.95*np.max(psf2_stitched)
+        
         # print("VMIN VMAX 122")
         # print(vmin<=vmax)
-        plt.imshow(psf2_stitched, origin='lower', cmap=cmap, norm=LogNorm(vmin=vmin, vmax=vmax))
+        norm = simple_norm(epsf_2[0].data, 'log', percent=99.5)
+        plt.imshow(epsf_2[0].data, norm=norm, origin='lower', cmap='gray')
         # plt.xlabel('$k$')
         # plt.ylabel('$log(P)$')
-        plt.title(f"PSF stitched",fontsize='small')
+        
         plt.show()
         # plt.legend()
         
@@ -2802,67 +2904,59 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # print(kmed_psf2)
         k=np.array(kmed2)
         
-        print('max k',max(k),'\n\n')
-        #print(len(k))
+        
+       
         P_k=np.array(flux2[:,0])
-        # print(P_k)
-        # print(len(P_k))
+        
         E_k=np.array(flux_psf2[:,0])
         
-        cond_k=(k<300) #(int(cutout2.shape[0]/2.5))) #450
+        cond_k=(k<k_cond) #(int(cutout2.shape[0]/2.5))) #450
         print('len(E_k)',len(E_k), len(E_k[(cond_k)]))
-        print("&&&&&&&&&&&&&&&&&&&")
-        # print(cond_k)
-        # cond_k=(k>50) & (k<=256)
-        # P_k=P_k[(cond_k)]
-        # E_k=E_k[(cond_k)]
-        # k=k[(cond_k)]
+        
+        
 
         np.savetxt(f'../OUTPUT/{gxyid}/{gxy_name2}_k_Pk_Ek_ann{ann}_star{pnum}.txt', np.c_[k,P_k,E_k])
         
     
         
         P_0,P_1=utils.sbf_ps_fit(k[(cond_k)],E_k[(cond_k)],P_k[(cond_k)])
-        # print('P0',P_0,'\n\n')
+       
         
-        print('len p0',len(P_0))
-        # print(len(k[cond_k]))
-        # print("YOU ARE HERE %%%%%%%%%%%%")
-        ##(int(cutout2.shape[0]/(2.5*3))))
+        
+        
         clean_nan=(np.isfinite(P_0))
         P_0=np.round(P_0,3)
 
-        # k_clean=k[(cond_k)][(clean_nan)]
+        
         P_1=P_1[(clean_nan)]
         P_0=P_0[(clean_nan)]
-        # print(P_0)
-        window_arr=[10, 20,30,40,50,60,70]
+        
+        window_arr=[20,30,40,50,60,70]
         window_arr=np.array(window_arr)
         mad_gab=np.zeros(window_arr.shape)
         P0_windows=np.zeros(window_arr.shape)
         P0_windows_rms=np.zeros(window_arr.shape)
+        ranges_windows=[]
+        
         for i in range(len(window_arr)):    
-            moving_median_p0, moving_mad_p0, rms_p0 = utils.moving_median_mad(P_0,window_size=window_arr[i])
-        # print('moving median', moving_mad_p0)
+            moving_median_p0, moving_mad_p0, ranges = utils.moving_median_mad(P_0,window_size=window_arr[i])
             mad_gab[i]=(np.argmin(moving_mad_p0))
             P0_windows[i]=moving_median_p0[np.argmin(moving_mad_p0)]
-            P0_windows_rms[i]=rms_p0[np.argmin(moving_mad_p0)]
+            ranges_windows.append(ranges[np.argmin(moving_mad_p0)]) 
             # P_0_gab=moving_median_p0[np.argmin(moving_mad_p0)]
             # P_0_gab_rms=moving_median_p0[np.argmin(rms_p0)]
         
         P_0_gab=P0_windows[np.argmin(mad_gab)]
-        P_0_gab_rms=P0_windows_rms[np.argmin(mad_gab)]
+        range_gab=ranges_windows[np.argmin(mad_gab)]
+    
         # arr_half=P_0#[(cond_k)]
-        peaks, _=find_peaks(P_0)
-        print('len p0',len(P_0),'\n\n')
         # print('p0 and peaks',P_0, P_0[[peaks.astype(int)]],'\n\n')
         # print(P_0[peaks.astype(int)])
 
-        P_0_final=mode(P_0[peaks.astype(int)], nan_policy='omit',keepdims=False).mode
         # print(peaks)
         # print(P_0[peaks.astype(int)])
         # print(P_0_final.mode)
-        P_1_final=np.median(P_1[(P_0==P_0_final)])
+        P_1_final=np.median(P_1[range_gab[0]:range_gab[1]])
 
         fig = plt.figure(figsize=(7,10))
         font = {'family' : 'serif',
@@ -2882,34 +2976,30 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
         # plt.plot(k,np.log10(utils.sbf_ps(E_k,np.median(P_0),np.median(P_1))),color='indigo',label='P_k '+gxy_name2)
         # plt.plot(k,(P_k),color='indigo',label='P_k '+gxy_name2)
         # plt.plot(k,(utils.sbf_ps(E_k,P_0_final,P_1_final)),color='darkred',label='P_k '+gxy_name2)
-        plt.plot(k,np.log10(P_k),color='indigo',label='P_k '+gxy_name2)
-        plt.plot(k,np.log10(utils.sbf_ps(E_k,P_0_final,P_1_final)),color='darkred',label='Nand  '+gxy_name2)
+        plt.scatter(k,np.log10(P_k),color='grey',label='P_k '+gxy_name2,s=2,marker='x')
         plt.plot(k,np.log10(utils.sbf_ps(E_k,P_0_gab,P_1_final)),color='darkblue',label='Gab '+gxy_name2)
         plt.axvspan(int(cutout2.shape[0]/2),np.max(k),color='lightgrey',alpha=0.4)
         plt.axhline((np.log10(P_1_final)),color="darkred",linestyle="dotted", label='$P_0$')
         plt.xlabel('$k$')
-        plt.ylabel('$P$')
-        #plt.ylabel('$log(P)$')
-        # plt.xlim(0,400) 
+        # plt.ylabel('$P$')
+        plt.ylabel('$log(P)$')
+        plt.xlim(0,max(k[(cond_k)])+25) 
         plt.ylim(-2,0.7) 
         plt.title(f"{gxyid} $i$: $P(k)=P0*E(k)+P1$",fontsize='small')
             # plt.legend()
         
         plt.subplot(212)
-        plt.plot((P_0[P_0>0]),".",color='indigo')#,label='P_k '+gxy_name2)
-        plt.plot(peaks,(P_0[peaks.astype(int)]),"x",color="gold")
+        plt.plot((P_0[P_0>0]),"x",color='grey', markersize=3)#,label='P_k '+gxy_name2)
         # plt.plot(np.log10(P_0[P_0>0]),".",color='indigo')#,label='P_k '+gxy_name2)
         # plt.plot(peaks,np.log10(P_0[peaks.astype(int)]),"x",color="gold")
-        plt.axhline((P_0_final),color="darkred",linestyle="dotted", label='$P_0$ Peaks')
-        plt.axhline((P_0_gab),color="darkblue",linestyle="dotted", label='$P_0$ MAD')
-        plt.axhline((P_0_gab_rms),color="green",linestyle="dotted", label='$P_0$ RMS')
+        plt.axhline((P_0_gab),color="darkblue",linestyle="dotted")
         # plt.axhline(np.log10(P_0_final),color="darkred",linestyle="dotted", label='$P_0$')
         plt.legend()
         # plt.plot(k,np.log10(utils.sbf_ps(E_k,*popt_ps)),color='indigo',label='P_k '+gxy_name2)
         # plt.plot(k,np.log10(utils.sbf_ps(E_k,P_0,P_1)),color='indigo',label='P_k '+gxy_name2)
         plt.axvspan(int(cutout2.shape[0]/2),np.max(k),color='lightgrey',alpha=0.4)
         plt.ylim(-1,5)
-        # plt.xlim(0,400) 
+        plt.xlim(0,max(k[(cond_k)]))  
         plt.xlabel('$k_{start}$')
         plt.ylabel('$P_0$')
         # plt.ylabel('$log(P_0)$')
@@ -2931,19 +3021,19 @@ def run_part6_starpsf(gxyid, band1,band2, magzp1,magzp2,fwhm1,fwhm2,
 
         # P_r=0.051#P_0_final*0.05
         # m_i = -2.5*np.log10(P_0_final-P_r)+magzp2-ext_corr2#+2.5*np.log10(t_exp)
-        print(f'P_0={P_0_final}')
-        print(f'P_1={P_1_final}')
-        print('P0 gab is',P_0_gab,P_0_gab_rms)
+        print(f"for ANNULUS #{ann}")
+        print('P0 is',P_0_gab)
+        print('P1 is',P_1_final,'\n\n')
+        
         # print(f'P_r={P_r}')
         # print(f'm_i={m_i}')
-        p0[ind]=P_0_final
+        
         p1[ind]=P_1_final
         p0_gab[ind]=P_0_gab
         ind+=1
     
-    print(f"ANNULUS #{ann}")
-    print(f"P0= {p0}")
-    print(f"P1= {p1}")
-    return p0,p1,p0_gab
+    
+    
+    return p1,p0_gab
 
         # return P_0_final,P_1_final
